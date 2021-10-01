@@ -118,6 +118,12 @@ git-tree-sha1 = "e8a30e8019a512e4b6c56ccebc065026624660e8"
 uuid = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
 version = "1.7.0"
 
+[[ClassicalAndQuantumFIMs]]
+deps = ["LinearAlgebra", "OQSmodels", "QuantumOpticsBase", "ThreadsX"]
+path = "/home/scottd/.julia/dev/ClassicalAndQuantumFIMs"
+uuid = "af1c3194-0b7d-4af1-8e44-15d8583e2c2f"
+version = "0.1.0"
+
 [[CloseOpenIntervals]]
 deps = ["ArrayInterface", "Static"]
 git-tree-sha1 = "ce9c0d07ed6e1a4fecd2df6ace144cbd29ba6f37"
@@ -599,9 +605,9 @@ version = "0.4.7"
 
 [[LoopVectorization]]
 deps = ["ArrayInterface", "CPUSummary", "CloseOpenIntervals", "DocStringExtensions", "HostCPUFeatures", "IfElse", "LayoutPointers", "LinearAlgebra", "OffsetArrays", "PolyesterWeave", "Requires", "SLEEFPirates", "Static", "ThreadingUtilities", "UnPack", "VectorizationBase"]
-git-tree-sha1 = "6880358d96822f14b87924cbea4fe1d936afe315"
+git-tree-sha1 = "c2c1a765d943267ffc01fd6a127fcb482e80f63a"
 uuid = "bdcacae8-1622-11e9-2a5c-532679323890"
-version = "0.12.81"
+version = "0.12.82"
 
 [[MKL_jll]]
 deps = ["Artifacts", "IntelOpenMP_jll", "JLLWrappers", "LazyArtifacts", "Libdl", "Pkg"]
@@ -703,7 +709,7 @@ version = "0.3.11"
 
 [[OQSmodels]]
 deps = ["FiniteDiff", "FiniteDifferences", "IterTools", "LinearAlgebra", "PauliMasterEquation", "PyCall", "QuantumOptics", "Reexport", "Roots", "Statistics"]
-path = "/home/scottd/Dropbox/Physics/Research Work/Julia/ResearchPackages/OQSmodels"
+path = "/home/scottd/.julia/dev/OQSmodels"
 uuid = "67cd9eb3-fd8b-4719-9b75-e4624b1b85a1"
 version = "0.1.0"
 
@@ -758,9 +764,9 @@ version = "0.12.3"
 
 [[Parsers]]
 deps = ["Dates"]
-git-tree-sha1 = "9d8c00ef7a8d110787ff6f170579846f776133a9"
+git-tree-sha1 = "a8709b968a1ea6abc2dc1967cb1db6ac9a00dfb6"
 uuid = "69de0a69-1ddd-5017-9359-2bf0b02dc9f0"
-version = "2.0.4"
+version = "2.0.5"
 
 [[PauliMasterEquation]]
 deps = ["LinearAlgebra", "QuantumOpticsBase"]
