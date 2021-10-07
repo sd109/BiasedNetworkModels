@@ -80,7 +80,7 @@ version = "0.1.0"
 
 [[BlackBoxOptim]]
 deps = ["CPUTime", "Compat", "Distributed", "Distributions", "HTTP", "JSON", "LinearAlgebra", "Printf", "Random", "SpatialIndexing", "StatsBase"]
-git-tree-sha1 = "514bbe6f2e46cb396e684eb4c12d8a6c30f3adf4"
+path = "/home/scottd/.julia/dev/BlackBoxOptim"
 uuid = "a134a8b2-14d6-55f6-9291-3336d3ab0209"
 version = "0.6.0"
 

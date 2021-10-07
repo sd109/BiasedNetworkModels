@@ -2,7 +2,8 @@
 module NetworkOptim
 
 using LinearAlgebra, Statistics
-using ClassicalAndQuantumFIMs, Optim, GalacticOptim, BlackBoxOptim, JLD2, Serialization, Logging, Dates, ThreadsX
+using ClassicalAndQuantumFIMs, Optim, GalacticOptim, BlackBoxOptim, JLD2, Serialization, Logging, ThreadsX
+using Dates: Date, Time, format, now, datetime2unix
 using Flux: ADAM
 using ..BiasedNetworkModels: BiasedSheetModel, BiasedPrismModel, BiasedRingModel
 include("utilities.jl")
@@ -47,8 +48,6 @@ function create_run_params(; kwargs...) #kwargs are used to overwrite defaults
     (RP.WithDipoles && RP.DipoleVarSites === nothing) && error("Need to provide DipoleVarSites or set WithDipoles = false")
     (!RP.WithDipoles && RP.DipoleVarSites !== nothing) && error("Need to set WithDipoles = true when providing DipoleVarSites")
 
-    any(isfile.(RP.SaveName .* ["-res.sjl", "-res-bak.txt", "-trace.txt", "-res.jld2"])) && error("File name already exists - move existing file or choose different save name.")
-
     return RP
 end
 
@@ -81,7 +80,7 @@ function get_x(model, run_params)
         run_params.Symm && (idxs = idxs[1:length(idxs)÷model.Ham.num_chains])
         append!(x, Es[idxs])
     end
-    run_params.WithSep && push!(x, get_interchain_coupling(model))
+    run_params.WithSep && push!(x, 1/cbrt(get_interchain_coupling(model)))
     run_params.WithDipoles && append!(x, reduce(vcat, [get_dipole_angles(model, site) for site in run_params.DipoleVarSites]))
 
     return x
@@ -213,14 +212,14 @@ end
 # -------------------------------------------------------------------------------------------------------------------- #
 
 
-function current_and_QFIM_trace(model::OQSmodel, run_params::NamedTuple)#::Tuple{Float64, Float64}
+function current_and_QFIM_trace(model::OQSmodel, run_params::NamedTuple, I_ref::Real)#::Tuple{Float64, Float64}
     Iss = ss_current(model)
     QFIM = QuantumFIM(model, steady_state, FIM_params(model, run_params))::Matrix{ComplexF64} #Annotate return type
-    return (-Iss, real(tr(QFIM))) #Use -ve Iss since we want to maximize this value
+    return (-Iss/I_ref, real(tr(QFIM))) #Use -ve Iss since we want to maximize this value
 end
 
 #Version which sets new x before calc of objective values
-current_and_QFIM_trace(m::OQSmodel, x::Vector{R} where R <: Real, RP::NamedTuple) = current_and_QFIM_trace(update_x(m, x, RP), RP)
+current_and_QFIM_trace(m::OQSmodel, x::Vector{R} where R <: Real, RP::NamedTuple, I_ref::Real) = current_and_QFIM_trace(update_x(m, x, RP), RP, I_ref)
 
 
 # Flux algs don't allow any kwargs apart from maxiters, abstol & reltol, so need to implement trace saving and time limit with a callback function
@@ -233,7 +232,7 @@ function early_stopping_cb(params, obj, time_limit, start_time, obj_hist)
 
     #Check stopping criteria
     if run_time > time_limit
-        str = "Time limit ($(time_limit) s) reached --> quitting optimization run.\n"
+        str = "Time limit ($(time_limit) s) reached --> quitting optimization run.\n"Dates
         str *= "Final objective value = $(obj)\n"
         str *= "Final x vector: $(round.(params, sigdigits=4))\n"
         println(str)
@@ -251,6 +250,21 @@ function early_stopping_cb(params, obj, time_limit, start_time, obj_hist)
 end
 
 
+#For checking if single-obj optima are allowed to be added to initial MOO population
+function in_search_range(x::Vector, RP::NamedTuple) 
+
+    length(x) != length(RP.SearchRange) && error("length(x) = $(length(x)) but length(RP.SearchRange) = $(length(RP.SearchRange)) ===> Cannot check if x is within search range")
+
+    if !all(getindex.(RP.SearchRange, 1) .< x .< getindex.(RP.SearchRange, 2))
+        #Print some extra info if x is outwith search range
+        println("Elements that were within search range: ", getindex.(RP.SearchRange, 1) .< x .< getindex.(RP.SearchRange, 2))
+        return false
+    end
+
+    return true
+end
+
+
 
 
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -258,9 +272,11 @@ end
 # -------------------------------------------------------------------------------------------------------------------- #
 
 
-function run_ensemble_opt(model, run_params; alg=ADAM(0.001), dis=1e-2)
+function run_ensemble_opt(model, run_params, I_ref; alg=ADAM(0.001), dis=1e-2)
 
-    opt_func = OptimizationFunction((x, p) -> -1*ss_current(update_x!(p, x, run_params)), GalacticOptim.AutoFiniteDiff())
+    opt_func = OptimizationFunction((x, p) -> -1*ss_current(update_x!(p, x, run_params))/I_ref, GalacticOptim.AutoFiniteDiff())
+
+    flush(stdout) #Does this flush to file if redirect_stdout(f) has been called?
 
     #Optimize unperturbed model
     tmp_model = copy(model) #Avoid mutating input model
@@ -286,24 +302,51 @@ function run_ensemble_opt(model, run_params; alg=ADAM(0.001), dis=1e-2)
     return sol_list
 
 end
+#Version which calculates referece current automatically
+run_ensemble_opt(m::OQSmodel, RP::NamedTuple; kwargs...) = run_ensemble_opt(m, RP, ss_current(m); kwargs...)
 
 
-function run_multi_obj(RP::NamedTuple; obj_func=current_and_QFIM_trace, kwargs...) #kwargs are passed to run_ensemble_opt
+
+function run_multi_obj_opt(RP::NamedTuple; obj_func=current_and_QFIM_trace, kwargs...) #kwargs are passed to run_ensemble_opt
+
+    #Check that we wont overwrite existing results
+    any(isfile.(RP.SaveName .* ["-res.sjl", "-res-bak.txt", "-trace.txt", "-res.jld2"])) && error("File name already exists - move existing file or choose different save name.")
 
     start_model = init_model(RP)
+    I_ref = ss_current(start_model)
+
+    #Set search range for multi-obj opt automatically if it's not set
+    if RP.SearchRange === nothing
+        SR = Tuple{Float64, Float64}[] #Initialize vector of tuples
+        if RP.WithEs 
+            Es = site_energies(start_model)[RP.EnergyVarSites]
+            RP.Symm && (Es = Es[1:length(RP.EnergyVarSites)÷start_model.Ham.num_chains])
+            append!(SR, collect(zip(Es .- 5, Es .+ 5)))
+        end
+        if RP.WithSep
+            push!(SR, (1/cbrt(20), 1/cbrt(1e-3))) #Express limits in terms of maximal allowed (dimensionless) coupling
+        end
+        if RP.WithDipoles
+            append!(SR, repeat([(0.0, 2*π), (0.0, 1*π)], outer=length(RP.DipoleVarSites))) #Allow θs and ϕs between 0 and 2π & π respectively
+        end
+
+        RP = (RP..., SearchRange = SR) #Store search range in run params
+    end
 
 
-    # #Set search range for multi-obj opt automatically if it's not set
-    # if RP.SearchRange === nothing
-    #     SR = []
-    #     if RP.WithEs 
-    #         Es = site_energies(start_model)[RP.EnergyVarSites]
-    #         RP.Symm && (Es = Es[1:length(RP.EnergyVarSites)÷start_model.Ham.num_chains])
-    #         append!(SR, )
-    #     end
-    # end
+    # Note start time and run params in trace file
+    START_TIME = now()
+    open("$(RP.SaveName)-trace.txt", "w") do f
+        str = "\nStarting optimization run on $(Date(START_TIME)) at $(format(Time(START_TIME), "HH:MM:SS")) with run parameters:\n"
+        for (k, v) in pairs(RP)
+            str *= "  $k => $v\n"
+        end
+        write(f, str * "\n\n")
+    end
 
-    open("$(RP.SaveName)-trace.txt", "a") do f
+
+
+    save_data = open("$(RP.SaveName)-trace.txt", "a") do f
 
         #Send all printed output to a text file
         redirect_stdout(f)
@@ -312,39 +355,93 @@ function run_multi_obj(RP::NamedTuple; obj_func=current_and_QFIM_trace, kwargs..
         global_logger(logger)
 
         #Needs to be defined within 'open' block so that f is accesible
-        function PF_callback(oc::BlackBoxOptim.OptController)
+        function PF_callback(oc::BlackBoxOptim.OptRunController)
             println("Range of enhancement factors found so far: ", extrema(first.(getfield.(fitness.(pareto_frontier(oc.evaluator.archive)), :orig))), "\n")
             flush(f) #Force printing to file regularly for progress monitoring
         end
     
         # Perform single-obj ensemble opt
-        sol_list = run_ensemble_opt(start_model, RP; kwargs...)
+        sol_list = run_ensemble_opt(start_model, RP, I_ref; kwargs...)
 
         # Set up multi-obj opt run
         opt_ctrl = bbsetup(
-            x -> obj_func(start_model, x, RP), #Function to be optimized
+            x -> obj_func(start_model, x, RP, I_ref), #Function to be optimized
             Method=:borg_moea,
             FitnessScheme=ParetoFitnessScheme{2}(is_minimizing=true), #, aggregator=f -> f[1]), #Use aggregator to display largest enhancement factor in trace (rather than equally weighted sum of both objectives)
-            SearchRange=SEARCH_RANGE,
+            SearchRange=RP.SearchRange,
             # PopulationSize=100, #Default is 50
-            # MaxSteps = 2*10^5, #Is ignored in favour of MaxTime by BlackBoxOptim (unless MaxTime=0)
+            # MaxTime=RP.t2,
+            MaxSteps = RP.MaxSteps, #Is ignored by BlackBoxOptim if non-zero MaxTime is provide
             # MaxStepsWithoutProgress=10^5, #default is 10^4
             # MaxNumStepsWithoutFuncEvals = 5000, #Default is 100
             # ϵ=[1e-3, 1e-3], #Size of 'epsilon box' for measuring fitness progress
-            ϵ=1e-4, #Size of 'epsilon box' for measuring fitness progress
-            MaxTime=RP.t2,
-            TraceInterval=RP.t2/50,
-            # CallbackFunction = opt_ctrl -> flush(f), #Force printing to file regularly for progress monitoring
-            CallbackFunction = cb_func,
-            CallbackInterval=RP.t2/50,
+            ϵ=1e-5, #Size of 'epsilon box' for measuring fitness progress
+            TraceInterval=10,
+            CallbackFunction = PF_callback,
+            CallbackInterval=10,
         );
 
+        #Add ensemble opt results to starting population
+        viable_candidates = [sol.minimizer for sol in sol_list if in_search_range(sol.minimizer, RP)]
+        a, b = length(viable_candidates), length(sol_list)
+        if a < 0.1*b
+            error("$(round(a/b*100))% of single optimization candidate are within the search range -> restart calculation with wider search range")
+        else
+            println("$a / $b candidate solutions from ensemble opt added to initial multi-obj population.")
+        end
 
+        #Start multi-obj optimization run
+        println("\n\n\n Starting multi-objective optimization run:\n---------------------------------------------\n")
+        flush(f)
+        res = bboptimize(opt_ctrl, viable_candidates)
+
+
+        #   Save results 
+        ####################
+
+        # Might as well sort PF here instead of during later analysis
+        PF = pareto_frontier(res)
+        EFs = -1*getindex.(fitness.(PF), 1)
+        sorted_idxs = getindex.(sort(collect(zip(EFs, 1:length(EFs)))), 2)
+        PF = PF[sorted_idxs]
+
+        save_data = (
+            start_model = start_model,
+            run_params = RP,
+            sol_list = sol_list,
+            # single_obj_opts = [(sol.minimum, sol.minimizer) for sol in sol_list],
+            pf = PF,
+            MOO_starting_candidates = viable_candidates,
+            # MOO_opt_params = res.parameters,
+            MOO_stop_reason = res.stop_reason,
+        )
+
+        #Serialize relevant stuff as a named tuple
+        serialize("$(RP.SaveName)-res.sjl", save_data)
+        println("Results successfully serialized to: '$(RP.SaveName)-res.sjl'")
+
+        #Add MOO params after serialize save (these don't serialize nicely between different minor Julia versions due to anon callback funcs)
+        save_data = (save_data..., MOO_opt_params = res.parameters)
+
+        # Save a back up as a text file
+        open("$(RP.SaveName)-res-bak.txt", "w") do f_bak
+            for (name, val) in pairs(save_data)
+                println(f_bak, "\n[", name, "]\n", val, "\n")
+            end
+        end
+        println("Backup results successfully written to: '$(RP.SaveName)-res-bak.txt'")
+
+        # Save another backup using JLD2 just in case
+        jldsave("$(RP.SaveName)-res.jld2", res=save_data)
+        println("Additional backup results successfully saved to: '$(RP.SaveName)-res.jld2'")
+
+        save_data #Return save data from 'do' block
     end
 
-    return
-
+    return save_data #Return results from func as well as saving to files, just in case we want to work interactively
 end
 
 
-end
+
+
+end #Module
