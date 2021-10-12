@@ -51,7 +51,7 @@ end
 
 
 
-function init_model(run_params)
+function create_init_model(run_params)
 
     if run_params.Geom == :sheet
         return BiasedSheetModel(run_params.ChainLength, run_params.NumChains, run_params.dE_ratio; interchain_coupling=1/run_params.ChainSep^3, coupling_func=run_params.CouplingFunc)
@@ -308,7 +308,7 @@ function run_multi_obj_opt(RP::NamedTuple; obj_func=current_and_QFIM_trace, kwar
     #Check that we wont overwrite existing results
     any(isfile.(RP.SaveName .* ["-res.sjl", "-res-bak.txt", "-trace.txt", "-res.jld2"])) && error("File name already exists - move existing file or choose different save name.")
 
-    start_model = init_model(RP)
+    start_model = create_init_model(RP)
     I_ref = ss_current(start_model)
 
     #Set search range for multi-obj opt automatically if it's not set
@@ -323,7 +323,7 @@ function run_multi_obj_opt(RP::NamedTuple; obj_func=current_and_QFIM_trace, kwar
             push!(SR, (1/cbrt(20), 1/cbrt(1e-3))) #Express limits in terms of maximal allowed (dimensionless) coupling
         end
         if RP.WithDipoles
-            append!(SR, repeat([(-2*π, 2*π), (-1*π, 1*π)], outer=length(RP.DipoleVarSites))) #Allow θs within [-π, π] and ϕs within [-π/2, π/2]
+            append!(SR, repeat([(-π, π), (-π/2, π/2)], outer=length(RP.DipoleVarSites))) #Allow θs within [-π, π] and ϕs within [-π/2, π/2]
         end
 
         RP = (RP..., SearchRange = SR) #Store search range in run params
