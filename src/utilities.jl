@@ -3,8 +3,6 @@
 #                                      A collection of useful, reusable functions                                      #
 # -------------------------------------------------------------------------------------------------------------------- #
 
-using StaticArrays, OQSmodels, CoordinateTransformations
-
 
 # -------------------------------------- Hamiltonian geometry related functions -------------------------------------- #
 
@@ -233,22 +231,24 @@ get_dipole_components(m::OQSmodel, site::Int) = SVector(m.Ham.param_dict["dx$(si
 
 get_dipole_sphericals(m::OQSmodel, site::Int) = SphericalFromCartesian()(get_dipole_components(m, site))
 
-get_dipole_angles(m::OQSmodel, site::Int) = (d = get_dipole_sphericals(m, site); [d.θ % π, d.ϕ % π/2]) #Use modulo ensure we don't end up with arbitrarily large angles (CoordinateTransformations uses -π<θ<π & -π/2<ϕ<π/2)
+# get_dipole_angles(m::OQSmodel, site::Int) = (d = get_dipole_sphericals(m, site); [d.θ % π, d.ϕ % π/2]) #Use modulo ensure we don't end up with arbitrarily large angles (CoordinateTransformations uses -π<θ<π & -π/2<ϕ<π/2)
+get_dipole_angles(m::OQSmodel, site::Int) = (d = get_dipole_sphericals(m, site); [d.θ, d.ϕ]) #Don't need to use modulo here since CoordinateTransformations.jl will enforce first quadrant constraints internally
+
+get_dipole_angles(m::OQSmodel) = [get_dipole_angles(m, site) for site in 1:numsites(m)]
 
 
 function vary_dipole_θ!(m, site, θ; kwargs...)
     d = get_dipole_sphericals(m, site) #Get existing dipole orientation
-    dx, dy, dz = CartesianFromSpherical()(Spherical(d.r, θ, d.ϕ))  #Get cartesian components of new dipole orientation
+    dx, dy, dz = CartesianFromSpherical()(Spherical(d.r, θ % π, d.ϕ)) #Get cartesian components of new dipole orientation (use % π to ensure perturbed angles remain in first quadrant)
     return vary_dipole_orientation!(m, site, dx, dy, dz; kwargs...)
 end
 
 #Non-mutating version
 vary_dipole_θ(m, site, θ; kwargs...) = vary_dipole_θ!(copy(m), site, θ; kwargs...)
 
-
 function vary_dipole_ϕ!(m, site, ϕ; kwargs...)
     d = get_dipole_sphericals(m, site) #Get existing dipole orientation
-    dx, dy, dz = CartesianFromSpherical()(Spherical(d.r, d.θ, ϕ))  #Get cartesian components of new dipole orientation
+    dx, dy, dz = CartesianFromSpherical()(Spherical(d.r, d.θ, ϕ % π/2 )) #Get cartesian components of new dipole orientation (use % π/2 to ensure perturbed angles remain in first quadrant)
     return vary_dipole_orientation!(m, site, dx, dy, dz; kwargs...)
 end
 #Non-mutating version

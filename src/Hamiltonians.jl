@@ -15,15 +15,6 @@
 # We can then write various helper functions to dispatch on this type
 
 
-
-using LinearAlgebra, StaticArrays, Rotations, CoordinateTransformations, QuantumOpticsBase
-using IterTools: subsets
-using OQSmodels
-using OQSmodels: vary_Hamiltonian_param
-
-
-
-
 mutable struct BiasedNetworkHamiltonian{F <: Any, O <: DataOperator} <: SystemHamiltonian
     chain_length::Int
     num_chains::Int

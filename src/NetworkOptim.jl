@@ -1,11 +1,4 @@
 
-module NetworkOptim
-
-using LinearAlgebra, Statistics
-using ClassicalAndQuantumFIMs, Optim, GalacticOptim, BlackBoxOptim, JLD2, Serialization, Logging, Dates, ThreadsX
-using Flux: ADAM
-using ..BiasedNetworkModels: BiasedSheetModel, BiasedPrismModel, BiasedRingModel
-include("utilities.jl")
 
 const default_run_params = (
     #Essentials
@@ -163,9 +156,10 @@ perturb_chain_sep(model; kwargs...) = perturb_chain_sep!(copy(model); kwargs...)
 #Randomly perturbs all dipole orientations with std dev of `dis` / 2π radians
 function perturb_dipole_angles!(model; dis=1e-2, kwargs...)
 
-    all_angles = reduce(vcat, [get_dipole_angles(model, s) for s in 1:numsites(model)])
-    θs = all_angles[1:2:end] .% π
-    ϕs = all_angles[2:2:end] .% π/2
+    # all_angles = reduce(vcat, [get_dipole_angles(model, s) for s in 1:numsites(model)])
+    all_angles = reduce(vcat, get_dipole_angles(model))
+    θs = all_angles[1:2:end] #.% π
+    ϕs = all_angles[2:2:end] #.% π/2
 
     for (site, (θ, ϕ)) in enumerate(zip(θs, ϕs))
         vary_dipole_θ!(model, site, θ + 2*π*dis*randn(); kwargs...)
@@ -443,6 +437,3 @@ function run_multi_obj_opt(RP::NamedTuple; obj_func=current_and_QFIM_trace, kwar
 end
 
 
-
-
-end #Module
