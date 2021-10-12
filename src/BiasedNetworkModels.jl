@@ -15,7 +15,7 @@ include("Hamiltonians.jl")
 include("Models.jl")
 include("NetworkOptim.jl")
 using .NetworkOptim #Make Optim it's own internal (sub) module
-
+export NetworkOptim
 
 # # -------------------------------------------------------------------------------------------------------------------- #
 # #                                            Construction of actual OQSmodel                                           #

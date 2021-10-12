@@ -46,7 +46,7 @@ rescaled_Sw_drude_lorentz(w, T, Γ, ωc, γ) =  w == 0 ? 0 : π*γ*Γ*abs(w) / (
 # -------------------------------------------- Transport-related functions ------------------------------------------- #
 
 
-function ss_current(model::OQSmodel; ss=steady_state(model), single_ex_tol=0.9)::Float64
+function ss_current(model::OQSmodel; ss=steady_state(model), single_ex_tol=0.5)::Float64
 
     Pss = populations(ss)
 
@@ -233,7 +233,7 @@ get_dipole_components(m::OQSmodel, site::Int) = SVector(m.Ham.param_dict["dx$(si
 
 get_dipole_sphericals(m::OQSmodel, site::Int) = SphericalFromCartesian()(get_dipole_components(m, site))
 
-get_dipole_angles(m::OQSmodel, site::Int) = (d = get_dipole_sphericals(m, site); [d.θ, d.ϕ])
+get_dipole_angles(m::OQSmodel, site::Int) = (d = get_dipole_sphericals(m, site); [d.θ % π, d.ϕ % π/2]) #Use modulo ensure we don't end up with arbitrarily large angles (CoordinateTransformations uses -π<θ<π & -π/2<ϕ<π/2)
 
 
 function vary_dipole_θ!(m, site, θ; kwargs...)

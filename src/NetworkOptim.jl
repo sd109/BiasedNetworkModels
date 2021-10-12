@@ -2,8 +2,7 @@
 module NetworkOptim
 
 using LinearAlgebra, Statistics
-using ClassicalAndQuantumFIMs, Optim, GalacticOptim, BlackBoxOptim, JLD2, Serialization, Logging, ThreadsX
-using Dates: Date, Time, format, now, datetime2unix
+using ClassicalAndQuantumFIMs, Optim, GalacticOptim, BlackBoxOptim, JLD2, Serialization, Logging, Dates, ThreadsX
 using Flux: ADAM
 using ..BiasedNetworkModels: BiasedSheetModel, BiasedPrismModel, BiasedRingModel
 include("utilities.jl")
@@ -122,8 +121,8 @@ function update_x!(model, x, run_params)
 
     if run_params.WithDipoles
         new_dipole_angles = x[i_start:end]
-        new_θs = new_dipole_angles[1:2:end]
-        new_ϕs = new_dipole_angles[2:2:end]
+        new_θs = new_dipole_angles[1:2:end] .% π #Make sure angles are within [-π, π]
+        new_ϕs = new_dipole_angles[2:2:end] .% π/2 #Make sure angles are within [-π/2, π/2]
         for (site, θ, ϕ) in zip(run_params.DipoleVarSites, new_θs, new_ϕs)
             vary_dipole_orientation!(model, site, CartesianFromSpherical()(Spherical(1, θ, ϕ))..., update_H=false, update_L=false)
         end
@@ -165,8 +164,8 @@ perturb_chain_sep(model; kwargs...) = perturb_chain_sep!(copy(model); kwargs...)
 function perturb_dipole_angles!(model; dis=1e-2, kwargs...)
 
     all_angles = reduce(vcat, [get_dipole_angles(model, s) for s in 1:numsites(model)])
-    θs = all_angles[1:2:end]
-    ϕs = all_angles[2:2:end]
+    θs = all_angles[1:2:end] .% π
+    ϕs = all_angles[2:2:end] .% π/2
 
     for (site, (θ, ϕ)) in enumerate(zip(θs, ϕs))
         vary_dipole_θ!(model, site, θ + 2*π*dis*randn(); kwargs...)
@@ -232,7 +231,7 @@ function early_stopping_cb(params, obj, time_limit, start_time, obj_hist)
 
     #Check stopping criteria
     if run_time > time_limit
-        str = "Time limit ($(time_limit) s) reached --> quitting optimization run.\n"Dates
+        str = "Time limit ($(time_limit) s) reached --> quitting optimization run.\n"
         str *= "Final objective value = $(obj)\n"
         str *= "Final x vector: $(round.(params, sigdigits=4))\n"
         println(str)
@@ -255,9 +254,12 @@ function in_search_range(x::Vector, RP::NamedTuple)
 
     length(x) != length(RP.SearchRange) && error("length(x) = $(length(x)) but length(RP.SearchRange) = $(length(RP.SearchRange)) ===> Cannot check if x is within search range")
 
-    if !all(getindex.(RP.SearchRange, 1) .< x .< getindex.(RP.SearchRange, 2))
+    min_vals = getindex.(RP.SearchRange, 1)
+    max_vals = getindex.(RP.SearchRange, 2)
+    if !all(min_vals .<= x .<= max_vals)
         #Print some extra info if x is outwith search range
         println("Elements that were within search range: ", getindex.(RP.SearchRange, 1) .< x .< getindex.(RP.SearchRange, 2))
+        println("Elements: ", collect(zip(min_vals, x, max_vals)), "\n")
         return false
     end
 
@@ -276,8 +278,6 @@ function run_ensemble_opt(model, run_params, I_ref; alg=ADAM(0.001), dis=1e-2)
 
     opt_func = OptimizationFunction((x, p) -> -1*ss_current(update_x!(p, x, run_params))/I_ref, GalacticOptim.AutoFiniteDiff())
 
-    flush(stdout) #Does this flush to file if redirect_stdout(f) has been called?
-
     #Optimize unperturbed model
     tmp_model = copy(model) #Avoid mutating input model
     x0 = get_x(tmp_model, run_params)
@@ -293,7 +293,9 @@ function run_ensemble_opt(model, run_params, I_ref; alg=ADAM(0.001), dis=1e-2)
         prob = GalacticOptim.OptimizationProblem(opt_func, x0, tmp_model)
         obj_hist = [] #Create local list for storing history
         start_time = Dates.datetime2unix(Dates.now())
-        solve(prob, alg, maxiters=run_params.SingleObjMaxIters, cb = (p, f_x) -> early_stopping_cb(p, f_x, run_params.SingleObjTimeLimit, start_time, obj_hist))
+        sol = solve(prob, alg, maxiters=run_params.SingleObjMaxIters, cb = (p, f_x) -> early_stopping_cb(p, f_x, run_params.SingleObjTimeLimit, start_time, obj_hist))
+        flush(stdout) #Does this flush to file if redirect_stdout(f) has been called? I think so
+        sol
     end
 
     #Wait for unperturbed opt to finish too, then add it to sol_list
@@ -327,17 +329,16 @@ function run_multi_obj_opt(RP::NamedTuple; obj_func=current_and_QFIM_trace, kwar
             push!(SR, (1/cbrt(20), 1/cbrt(1e-3))) #Express limits in terms of maximal allowed (dimensionless) coupling
         end
         if RP.WithDipoles
-            append!(SR, repeat([(0.0, 2*π), (0.0, 1*π)], outer=length(RP.DipoleVarSites))) #Allow θs and ϕs between 0 and 2π & π respectively
+            append!(SR, repeat([(-2*π, 2*π), (-1*π, 1*π)], outer=length(RP.DipoleVarSites))) #Allow θs within [-π, π] and ϕs within [-π/2, π/2]
         end
 
         RP = (RP..., SearchRange = SR) #Store search range in run params
     end
 
-
     # Note start time and run params in trace file
-    START_TIME = now()
+    START_TIME = Dates.now()
     open("$(RP.SaveName)-trace.txt", "w") do f
-        str = "\nStarting optimization run on $(Date(START_TIME)) at $(format(Time(START_TIME), "HH:MM:SS")) with run parameters:\n"
+        str = "\nStarting optimization run on $(Dates.Date(START_TIME)) at $(Dates.format(Dates.Time(START_TIME), "HH:MM:SS")) with run parameters:\n"
         for (k, v) in pairs(RP)
             str *= "  $k => $v\n"
         end
