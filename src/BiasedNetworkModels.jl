@@ -23,7 +23,7 @@ export BiasedSheetModel, BiasedPrismModel, BiasedRingModel
 
 using ClassicalAndQuantumFIMs, Optim, GalacticOptim, BlackBoxOptim, JLD2, Serialization, Logging, Dates, ThreadsX #NetworkOptim specific imports
 include("NetworkOptim.jl")
-export update_x!, update_x, perturb_x!, perturb_x
+export update_x!, update_x, perturb_x!, perturb_x, create_run_params, create_init_model, run_ensemble_opt, run_multi_obj_opt
 
 
 end # module
