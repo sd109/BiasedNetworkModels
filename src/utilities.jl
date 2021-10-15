@@ -227,7 +227,10 @@ end
 # --------------------------------------------------- Dipole angles -------------------------------------------------- #
 
 
-get_dipole_components(m::OQSmodel, site::Int) = SVector(m.Ham.param_dict["dx$(site)"], m.Ham.param_dict["dy$(site)"], m.Ham.param_dict["dz$(site)"])
+get_dipole_components(Ham::BiasedNetworkHamiltonian, site::Int) = SVector(Ham.param_dict["dx$(site)"], Ham.param_dict["dy$(site)"], Ham.param_dict["dz$(site)"])
+get_dipole_components(m::OQSmodel, site::Int) = get_dipole_components(m.Ham, site)
+get_dipole_components(m::OQSmodel) = [get_dipole_components(m, s) for s in 1:numsites(m)]
+
 
 get_dipole_sphericals(m::OQSmodel, site::Int) = SphericalFromCartesian()(get_dipole_components(m, site))
 
