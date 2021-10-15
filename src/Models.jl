@@ -116,7 +116,6 @@ function BiasedNetworkModel(H;
         L_decay = transport_generator(H.op, decay_procs, ME_type)
 
     end
-    @show L_decay
 
     #Phonons
     deph_ops = OQSmodels.site_dephasing_ops(H)
