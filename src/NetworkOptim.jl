@@ -14,10 +14,10 @@ const default_run_params = (
     WithEs = true,
     WithSep = false,
     WithDipoles = false,
-    EnergyVarSites = nothing, #What's the best way to set these?
+    EnergyVarSites = nothing, #What's the best way to set these? - in separate command line app script (see RunMultiObjectiveOpt.jl)
     DipoleVarSites = nothing,
     SingleObjTimeLimit = 60,
-    SingleObjMaxIters = 10^7, #Prefer to rely on time limit
+    SingleObjMaxIters = 10^7, #Prefer to rely on time limit but set this as fallback
     MaxSteps = 10^5,
     NumEnsemble = 15,
     Symm = true,
@@ -303,7 +303,7 @@ run_ensemble_opt(m::OQSmodel, RP::NamedTuple; kwargs...) = run_ensemble_opt(m, R
 
 
 
-function run_multi_obj_opt(RP::NamedTuple; obj_func=current_and_QFIM_trace, kwargs...) #kwargs are passed to run_ensemble_opt
+function run_multi_obj_opt(RP::NamedTuple; obj_func=current_and_QFIM_trace, trace_interval=600, kwargs...) #kwargs are passed to run_ensemble_opt
 
     #Check that we wont overwrite existing results
     any(isfile.(RP.SaveName .* ["-res.sjl", "-res-bak.txt", "-trace.txt", "-res.jld2"])) && error("File name already exists - move existing file or choose different save name.")
@@ -371,9 +371,9 @@ function run_multi_obj_opt(RP::NamedTuple; obj_func=current_and_QFIM_trace, kwar
             # MaxNumStepsWithoutFuncEvals = 5000, #Default is 100
             # ϵ=[1e-3, 1e-3], #Size of 'epsilon box' for measuring fitness progress
             ϵ=1e-5, #Size of 'epsilon box' for measuring fitness progress
-            TraceInterval=10,
+            TraceInterval=trace_interval,
             CallbackFunction = PF_callback,
-            CallbackInterval=10,
+            CallbackInterval=trace_interval,``
         );
 
         #Add ensemble opt results to starting population
