@@ -192,12 +192,16 @@ function BiasedNetworkHamiltonian(p::Dict{String, Float64}, chain_length::Int, n
     end
 
     #And inter-site couplings
+    site_pos = [[p["x$i"], p["y$i"], p["z$i"]] for i in 1:num_sites]
+    dipoles = [[p["dx$i"], p["dy$i"], p["dz$i"]] for i in 1:num_sites]
     for (i, j) in subsets(1:num_sites, 2)
-        pos1 = [p["x$i"], p["y$i"], p["z$i"]]
-        pos2 = [p["x$j"], p["y$j"], p["z$j"]]
-        d1 = [p["dx$i"], p["dy$i"], p["dz$i"]]
-        d2 = [p["dx$j"], p["dy$j"], p["dz$j"]]
-        V_ij = coupling_func(pos1, pos2, d1, d2)
+        # pos1 = [p["x$i"], p["y$i"], p["z$i"]]
+        # pos2 = [p["x$j"], p["y$j"], p["z$j"]]
+        # d1 = [p["dx$i"], p["dy$i"], p["dz$i"]]
+        # d2 = [p["dx$j"], p["dy$j"], p["dz$j"]]
+        # V_ij = coupling_func(pos1, pos2, d1, d2)
+
+        V_ij = coupling_func(site_pos[i], site_pos[j], dipoles[i], dipoles[j])
         H[i, j] = V_ij
         H[j, i] = V_ij
     end
@@ -213,7 +217,8 @@ function BiasedNetworkHamiltonian(p::Dict{String, Float64}, chain_length::Int, n
 end
 
 #For finite-diff compatibility with OQSmodels/ModelCalculus.jl
-SystemHamiltonian(H::BiasedNetworkHamiltonian) = BiasedNetworkHamiltonian(H.param_dict, H.chain_length, H.num_chains, H.coupling_func, H.geom_type)
+# SystemHamiltonian(H::BiasedNetworkHamiltonian) = BiasedNetworkHamiltonian(H.param_dict, H.chain_length, H.num_chains, H.coupling_func, H.geom_type)
+OQSmodels.update_H!(H::BiasedNetworkHamiltonian) = BiasedNetworkHamiltonian(H.param_dict, H.chain_length, H.num_chains, H.coupling_func, H.geom_type)
 
 
 
