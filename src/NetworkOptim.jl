@@ -57,8 +57,10 @@ function create_init_model(run_params)
         return BiasedSheetModel(run_params.ChainLength, run_params.NumChains, run_params.dE_ratio; interchain_coupling=1/run_params.ChainSep^3, coupling_func=run_params.CouplingFunc)
     elseif run_params.Geom == :prism
         return BiasedPrismModel(run_params.ChainLength, run_params.NumChains, run_params.dE_ratio; interchain_coupling=1/run_params.ChainSep^3, coupling_func=run_params.CouplingFunc)
-    elseif occursin(string(run_params.Geom), "ring")
+    elseif occursin("ring", string(run_params.Geom))
         return BiasedRingModel(run_params.ChainLength, run_params.dE_ratio, run_params.Geom; coupling_func=run_params.CouplingFunc)
+    else
+        error("Could not create starting model for geom: $(run_params.Geom)")
     end
 end
 
