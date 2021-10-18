@@ -14,7 +14,7 @@ export ss_current, get_dipole_angles, get_interchain_coupling
 
 
 include("Hamiltonians.jl")
-export BiasedSheetHamiltonian, BiasedPrismHamiltonian, BiasedRingHamiltonian
+# export BiasedSheetHamiltonian, BiasedPrismHamiltonian, BiasedRingHamiltonian
 
 
 include("Models.jl")
