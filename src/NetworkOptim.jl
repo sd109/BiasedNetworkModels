@@ -377,7 +377,7 @@ function run_multi_obj_opt(RP::NamedTuple; obj_func=current_and_QFIM_trace, trac
         logger = SimpleLogger(f)
         global_logger(logger)
 
-        #Needs to be defined within 'open' block so that f is accesible
+        #Needs to be defined within 'open' block so that 'f' is accesible (I guess `flush(stdout)` instead would do the same thing?)
         function PF_callback(oc::BlackBoxOptim.OptRunController)
             println("Range of enhancement factors found so far: ", extrema(first.(getfield.(fitness.(pareto_frontier(oc.evaluator.archive)), :orig))), "\n")
             flush(f) #Force printing to file regularly for progress monitoring
