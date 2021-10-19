@@ -190,7 +190,32 @@ end
 perturb_x(model, RP; kwargs...) = perturb_x!(copy(model), RP; kwargs...)
 
 
+#Makes sure all polar angles are within [-π, π] & all azimuth angles within [-π/2, π/2]
+function fold_angles(x, RP)
 
+    #If dipoles aren't included in x then just return to caller
+    !(RP.WithDipoles) && return x
+
+    new_x = copy(x) #Avoid mutating input vec
+    idx = 1 #idx of first angle in x vec
+
+    if RP.WithEs
+        num_Es = RP.Symm ? length(RP.EnergyVarSites) ÷ RP.NumChains : length(RP.EnergyVarSites)
+        idx += num_Es
+    end 
+    if RP.WithSep
+        idx += 1
+    end
+
+    #Check idx looks correct
+    @assert length(new_x[idx:end]) == 2*length(RP.DipoleVarSites)
+
+    #Rescale angles
+    new_x[idx:2:end] .%= π
+    new_x[idx+1:2:end] .%= π/2
+
+    return new_x
+end
 
 
 function FIM_params(model, run_params)
@@ -325,7 +350,8 @@ function run_multi_obj_opt(RP::NamedTuple; obj_func=current_and_QFIM_trace, trac
             push!(SR, (1/cbrt(20), 1/cbrt(1e-3))) #Express limits in terms of maximal allowed (dimensionless) coupling
         end
         if RP.WithDipoles
-            append!(SR, repeat([(-π, π), (-π/2, π/2)], outer=length(RP.DipoleVarSites))) #Allow θs within [-π, π] and ϕs within [-π/2, π/2]
+            append!(SR, repeat([(-π, π), (-π/2, π/2)], outer=length(RP.DipoleVarSites))) #Allow θs within [-π, π] and ϕs within [-π/2, π/2] (allow 10% outside either way)
+            # append!(SR, repeat([ 1.1 .* (-π, π), 1.1 .* (-π/2, π/2)], outer=length(RP.DipoleVarSites))) #Allow θs within [-π, π] and ϕs within [-π/2, π/2] (allow 10% outside either way)
         end
 
         RP = (RP..., SearchRange = SR) #Store search range in run params
@@ -375,11 +401,12 @@ function run_multi_obj_opt(RP::NamedTuple; obj_func=current_and_QFIM_trace, trac
             ϵ=1e-5, #Size of 'epsilon box' for measuring fitness progress
             TraceInterval=trace_interval,
             CallbackFunction = PF_callback,
-            CallbackInterval=trace_interval,``
+            CallbackInterval=trace_interval,
         );
 
         #Add ensemble opt results to starting population
-        viable_candidates = [sol.minimizer for sol in sol_list if in_search_range(sol.minimizer, RP)]
+        candidates = [fold_angles(sol.minimizer, RP) for sol in sol_list]
+        viable_candidates = [c for c in candidates if in_search_range(c, RP)]
         a, b = length(viable_candidates), length(sol_list)
         if a < 0.1*b
             error("$(round(a/b*100))% of single optimization candidate are within the search range -> restart calculation with wider search range")
