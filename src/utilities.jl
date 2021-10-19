@@ -193,8 +193,8 @@ function vary_energies_and_orientations_and_coupling!(m::OQSmodel, x::Vector{R} 
     Es = x[1:L]
     new_coupling = x[L+1]
     dipole_angles = x[L+2:end]
-    dipole_θs = x[1:2:end]
-    dipole_ϕs = x[2:2:end]
+    dipole_θs = dipole_angles[1:2:end]
+    dipole_ϕs = dipole_angles[2:2:end]
 
     vary_site_energies!(m, Es, E_sites, update_H=false, update_L=false)
     vary_interchain_coupling!(m, new_coupling, update_H=false, update_L=false) 
@@ -289,3 +289,27 @@ DipoleAngleDeriv(m::OQSmodel, sites::Union{UnitRange{Int}, Vector}, scale::Real)
 #Dispatch on all sites, both angles
 DipoleAngleDeriv(m::OQSmodel, scale::Real) = DipoleAngleDeriv(m, 1:numsites(m), scale)
 
+
+
+
+# -------------------------------------------------------------------------------------------------------------------- #
+#                                               Useful analysis utilities                                              #
+# -------------------------------------------------------------------------------------------------------------------- #
+
+get_decay_ops(m::OQSmodel) = m.Ham.coupling_func == full_dipole_coupling ? oper.([m.env_processes[Symbol("decay_$a")] for a in ["x", "y", "z"]]) : oper.([m.env_processes.decay])
+
+export eigenstate_brightness
+function eigenstate_brightness(m::OQSmodel)
+    _, eigstates = eigenstates(m.Ham.op) #Drop ground state (idx 1)
+    gs = nlevelstate(basis(m.Ham), get_env_state(m.Ham, "ground").idx)
+    return [sum(abs2(dagger(gs) * op * st) for op in get_decay_ops(m)) for st in eigstates[2:end]]
+end
+
+export eigen_populations
+function eigen_populations(m::OQSmodel; ss=steady_state(m).data) 
+    U = eigvecs(Array(m.Ham.op.data))
+    return [(dot(v, ss, v)) for v in eachcol(U)]
+end
+
+export ss_emission_rates
+ss_emission_rates(m::OQSmodel; kwargs...) = eigenstate_brightness(m) .* eigen_populations(m; kwargs...)[2:end]
