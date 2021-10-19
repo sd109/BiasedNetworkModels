@@ -98,7 +98,7 @@ function BiasedNetworkModel(H;
 
         spectral_func = simple_spectra ? Sw_flat_down : Sw_flat
         decay_procs = EnvProcess[InteractionOp("decay_$i", transition(Float64, b, ground.idx, i)+transition(Float64, b, i, ground.idx), SpectralDensity(spectral_func, (T=T_cold, rate=γ_decay))) for i in 1:numsites(H)]
-        L_decay = transport_generator(H.op, decay_procs, ME_type)    
+        L_decay = transport_generator(H.op, decay_procs, ME_type)
     
         #Weight eigenstate transitions by their collective transition dipole moments
         site_dipoles = [get_dipole_components(H, site) for site in 1:numsites(H)]
@@ -114,7 +114,6 @@ function BiasedNetworkModel(H;
         spectral_func = simple_spectra ? Sw_flat_down : Sw_flat
         decay_procs = [InteractionOp("decay", decay_op, SpectralDensity(spectral_func, (T=T_cold, rate=γ_decay)))]
         L_decay = transport_generator(H.op, decay_procs, ME_type)
-
     end
 
     #Phonons
