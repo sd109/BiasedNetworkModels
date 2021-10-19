@@ -1,7 +1,7 @@
 module BiasedNetworkModels
 
 
-using LinearAlgebra, Statistics, StaticArrays, Rotations, CoordinateTransformations, QuantumOpticsBase, OQSmodels
+using LinearAlgebra, Statistics, StaticArrays, Rotations, CoordinateTransformations, QuantumOptics, OQSmodels
 using IterTools: subsets
 using FiniteDiff: finite_difference_derivative
 using Statistics: mean
