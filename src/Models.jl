@@ -90,30 +90,54 @@ function BiasedNetworkModel(H;
     ground = get_env_state(H, "ground") 
     b = basis(H)
 
-    #=
-    Here, we want to account for the effects of dipole orientations on radiative decay rates.
-    I think the easiest way to do this is to create a separate generator for decays and then modify the matrix elements individually.
-    =#
-    if H.coupling_func == full_dipole_coupling
+    # #=
+    # Here, we want to account for the effects of dipole orientations on radiative decay rates.
+    # I think the easiest way to do this is to create a separate generator for decays and then modify the matrix elements individually.
+    # =#
+    # if H.coupling_func == full_dipole_coupling
 
-        spectral_func = simple_spectra ? Sw_flat_down : Sw_flat
-        decay_procs = EnvProcess[InteractionOp("decay_$i", transition(Float64, b, ground.idx, i)+transition(Float64, b, i, ground.idx), SpectralDensity(spectral_func, (T=T_cold, rate=γ_decay))) for i in 1:numsites(H)]
-        L_decay = transport_generator(H.op, decay_procs, ME_type)
+    #     ds = [get_dipole_components(H, site) for site in 1:numsites(H)]
+    #     spectral_func = simple_spectra ? Sw_flat_down : Sw_flat
+    #     decay_procs = EnvProcess[]
+    #     for (i, a) in enumerate(["x", "y", "z"])
+    #         op = sum([ds[n][i]*(transition(Float64, b, ground.idx, n)+transition(Float64, b, n, ground.idx)) for n in 1:numsites(H)])
+    #         push!(decay_procs, InteractionOp("decay_$(a)", op, SpectralDensity(spectral_func, (T=T_cold, rate=γ_decay))))
+    #     end
+    #     L_decay = transport_generator(H.op, decay_procs, ME_type)
     
-        #Weight eigenstate transitions by their collective transition dipole moments
+    #     #Weight eigenstate transitions by their collective transition dipole moments
+    #     # site_dipoles = [get_dipole_components(H, site) for site in 1:numsites(H)]
+    #     # eigstates = eachcol(U[1:end-1, 2:end]) #Drop ground state
+    #     # weightings = [norm(sum(v .* site_dipoles))^2 for v in eigstates]
+    #     # idxs = diagind(L_decay)[2:end]
+    #     # L_decay[idxs] .*= weightings
+    #     # L_decay[1, 2:end] .*= weightings
+
+    # else
+    #     #Single collective decay
+    #     decay_op = sum(transition(Float64, b, ground.idx, i) + transition(Float64, b, i, ground.idx) for i in 1:numsites(H)) #Collective decay op
+    #     spectral_func = simple_spectra ? Sw_flat_down : Sw_flat
+    #     decay_procs = [InteractionOp("decay", decay_op, SpectralDensity(spectral_func, (T=T_cold, rate=γ_decay)))]
+    #     L_decay = transport_generator(H.op, decay_procs, ME_type)
+    # end
+
+    #Collective radiative decay
+    if H.coupling_func == full_dipole_coupling
+        #Component-wise collective decay
+        spectral_func = simple_spectra ? Sw_flat_down : Sw_flat
         site_dipoles = [get_dipole_components(H, site) for site in 1:numsites(H)]
-        eigstates = eachcol(U[1:end-1, 2:end]) #Drop ground state
-        weightings = [norm(sum(v .* site_dipoles))^2 for v in eigstates]
-        idxs = diagind(L_decay)[2:end]
-        L_decay[idxs] .*= weightings
-        L_decay[1, 2:end] .*= weightings
+        decay_procs = []
+        for (i, a) in enumerate(["x", "y", "z"])
+            op_list = [transition(Float64, b, ground.idx, i) + transition(Float64, b, i, ground.idx) for i in 1:numsites(H)]
+            weightings = getindex.(site_dipoles, i)
+            push!(decay_procs, CollectiveInteractionOp("decay_$a", op_list, weightings, SpectralDensity(spectral_func, (T=T_cold, rate=γ_decay))))
+        end
 
     else
         #Single collective decay
         decay_op = sum(transition(Float64, b, ground.idx, i) + transition(Float64, b, i, ground.idx) for i in 1:numsites(H)) #Collective decay op
         spectral_func = simple_spectra ? Sw_flat_down : Sw_flat
         decay_procs = [InteractionOp("decay", decay_op, SpectralDensity(spectral_func, (T=T_cold, rate=γ_decay)))]
-        L_decay = transport_generator(H.op, decay_procs, ME_type)
     end
 
     #Phonons
@@ -142,16 +166,17 @@ function BiasedNetworkModel(H;
     end
 
     #List of (non-radiative-decay) env processes
-    other_env_procs = EnvProcess[
+    env_procs = EnvProcess[
         deph_procs...,
-        # decay_proc, 
+        decay_procs..., 
         inj_procs...,
         ext_procs...,
     ]
 
-    L_other = transport_generator(H.op, other_env_procs, ME_type)
+    # L = transport_generator(H.op, other_env_procs, ME_type)
 
-    return OQSmodel(H, [other_env_procs..., decay_procs...], ME_type, ground.idx, options=model_options, L=L_decay+L_other) #Use ground as initial state
+    # return OQSmodel(H, env_procs, ME_type, ground.idx, options=model_options, L=L) #Use ground as initial state
+    return OQSmodel(H, env_procs, ME_type, ground.idx, options=model_options) #Use ground as initial state
 
 end
 

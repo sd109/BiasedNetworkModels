@@ -152,12 +152,23 @@ end
 vary_interchain_coupling(model::OQSmodel, new_coupling_val; kwargs...) = vary_interchain_coupling!(copy(model), new_coupling_val; kwargs...)
 
 
-function vary_dipole_orientation!(m, site, dx, dy, dz; update_H=true, update_L=true)
+function vary_dipole_orientation!(m::OQSmodel, site, dx, dy, dz; update_H=true, update_L=true)
+
+    m.Ham.coupling_func != full_dipole_coupling && error("Varying dipole orientation makes no sense when coupling function is not 'full_dipole_coupling'")
+
+    #Update system Hamiltonian
     m.Ham.param_dict["dx$(site)"] = dx
     m.Ham.param_dict["dy$(site)"] = dy
     m.Ham.param_dict["dz$(site)"] = dz
     update_H && (m.Ham = update_H!(m.Ham)) #Recalculate H with updated param_dict
+
+    #Update collective decay env processes
+    m.env_processes[Symbol("decay_x")].weightings[site] = dx
+    m.env_processes[Symbol("decay_y")].weightings[site] = dy
+    m.env_processes[Symbol("decay_z")].weightings[site] = dz
+
     update_L && (m.L = transport_generator(m))
+
     return m
 end
 
