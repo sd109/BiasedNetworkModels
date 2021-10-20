@@ -63,6 +63,7 @@ function BiasedNetworkModel(H;
         γ_inj = 1e-6,
         γ_ext = 3e-2,
         γ_decay = 2e-2,
+        γ_nr = 1e-3,
         simple_spectra = true,
         T_cold = 0, # Only used if simple_spectra = false 
         T_hot = 20*2.5875, # Only used if simple_spectra = false 
@@ -84,44 +85,14 @@ function BiasedNetworkModel(H;
     rescale_inj && (γ_inj /= H.num_chains)
     rescale_ext && (γ_ext /= H.num_chains)
     rescale_decay && (γ_decay /= H.num_chains)
+    rescale_nr && (γ_nr /= H.num_chains)
 
 
     ### Env setup
     ground = get_env_state(H, "ground") 
     b = basis(H)
 
-    # #=
-    # Here, we want to account for the effects of dipole orientations on radiative decay rates.
-    # I think the easiest way to do this is to create a separate generator for decays and then modify the matrix elements individually.
-    # =#
-    # if H.coupling_func == full_dipole_coupling
-
-    #     ds = [get_dipole_components(H, site) for site in 1:numsites(H)]
-    #     spectral_func = simple_spectra ? Sw_flat_down : Sw_flat
-    #     decay_procs = EnvProcess[]
-    #     for (i, a) in enumerate(["x", "y", "z"])
-    #         op = sum([ds[n][i]*(transition(Float64, b, ground.idx, n)+transition(Float64, b, n, ground.idx)) for n in 1:numsites(H)])
-    #         push!(decay_procs, InteractionOp("decay_$(a)", op, SpectralDensity(spectral_func, (T=T_cold, rate=γ_decay))))
-    #     end
-    #     L_decay = transport_generator(H.op, decay_procs, ME_type)
-    
-    #     #Weight eigenstate transitions by their collective transition dipole moments
-    #     # site_dipoles = [get_dipole_components(H, site) for site in 1:numsites(H)]
-    #     # eigstates = eachcol(U[1:end-1, 2:end]) #Drop ground state
-    #     # weightings = [norm(sum(v .* site_dipoles))^2 for v in eigstates]
-    #     # idxs = diagind(L_decay)[2:end]
-    #     # L_decay[idxs] .*= weightings
-    #     # L_decay[1, 2:end] .*= weightings
-
-    # else
-    #     #Single collective decay
-    #     decay_op = sum(transition(Float64, b, ground.idx, i) + transition(Float64, b, i, ground.idx) for i in 1:numsites(H)) #Collective decay op
-    #     spectral_func = simple_spectra ? Sw_flat_down : Sw_flat
-    #     decay_procs = [InteractionOp("decay", decay_op, SpectralDensity(spectral_func, (T=T_cold, rate=γ_decay)))]
-    #     L_decay = transport_generator(H.op, decay_procs, ME_type)
-    # end
-
-    #Collective radiative decay
+    #Radiative decay
     if H.coupling_func == full_dipole_coupling
         #Component-wise collective decay
         spectral_func = simple_spectra ? Sw_flat_down : Sw_flat
@@ -139,6 +110,10 @@ function BiasedNetworkModel(H;
         spectral_func = simple_spectra ? Sw_flat_down : Sw_flat
         decay_procs = [InteractionOp("decay", decay_op, SpectralDensity(spectral_func, (T=T_cold, rate=γ_decay)))]
     end
+
+    #Non-radiative decay
+    spectral_func = simple_spectra ? Sw_flat_down : Sw_flat
+    nr_decay_procs = [InteractionOp("nr_decay_$i", transition(Float64, b, ground.idx, i) + transition(Float64, b, i, ground.idx), SpectralDensity(spectral_func, (T=T_cold, rate=γ_nr))) for i in 1:numsites(H)]
 
     #Phonons
     deph_ops = OQSmodels.site_dephasing_ops(H)
@@ -165,17 +140,18 @@ function BiasedNetworkModel(H;
         ext_procs = [InteractionOp("extract_$(site)", transition(Float64, b, ground.idx, site) + transition(Float64, b, site, ground.idx), SpectralDensity(spectral_func, (T=T_cold, γ=γ_ext))) for site in ext_sites]
     end
 
-    #List of (non-radiative-decay) env processes
+    #List of env processes
     env_procs = EnvProcess[
         deph_procs...,
         decay_procs..., 
+        nr_decay_procs...,
         inj_procs...,
         ext_procs...,
     ]
 
-    # L = transport_generator(H.op, other_env_procs, ME_type)
-
+    # L = transport_generator(H.op, other_env_procs, ME_type) #Precalculate L
     # return OQSmodel(H, env_procs, ME_type, ground.idx, options=model_options, L=L) #Use ground as initial state
+
     return OQSmodel(H, env_procs, ME_type, ground.idx, options=model_options) #Use ground as initial state
 
 end
