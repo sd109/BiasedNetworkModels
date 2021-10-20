@@ -1,38 +1,40 @@
 
+using Pkg; Pkg.activate("./BiasedNetworkModels")
 using BiasedNetworkModels, OQSmodels, BlackBoxOptim
-using BiasedNetworkModels: NetworkOptim
 
 N_sites = 12
 N_chains = 2
-RP = NetworkOptim.create_run_params(
-    SaveName = "12site-2parallel-withEs",
+RP = create_run_params(
+    SaveName = "test",
     Geom=:sheet, ChainLength=N_sites, NumChains=N_chains, 
+    CouplingFunc = BiasedNetworkModels.full_dipole_coupling,
     EnergyVarSites=[2:11..., 14:23...], 
-    NumEnsemble=15,
-    SingleObjTimeLimit = 3600,
+    NumEnsemble=2,
+    SingleObjTimeLimit = 10,
     SingleObjMaxIters = 10^6,
-    # WithSep=true, ChainSep=1.0,
-    # WithDipoles=true, DipoleVarSites=1:3,
-    MaxSteps=10^5,
+    WithSep=true, ChainSep=1.0,
+    WithDipoles=true, DipoleVarSites=1:N_sites*N_chains,
+    MaxSteps=10^2,
 )
 
 
-m = NetworkOptim.init_model(RP)
-x0 = NetworkOptim.get_x(m, RP)
+m = create_init_model(RP)
+@show ss_current(m)
+x0 = BiasedNetworkModels.get_x(m, RP)
 
-NetworkOptim.update_x(m, x0, RP)
+update_x(m, x0, RP)
 # NetworkOptim.update_x(m, [zeros(2)..., 2.0], RP)
 
-NetworkOptim.perturb_x(m, RP)
+# NetworkOptim.perturb_x(m, RP)
 
-NetworkOptim.FIM_params(m, RP)
+# NetworkOptim.FIM_params(m, RP)
 
-sol_list = NetworkOptim.run_ensemble_opt(m, RP);
-length(sol_list)
-sol_list[end].minimum
-sol_list[end].u
+# sol_list = NetworkOptim.run_ensemble_opt(m, RP);
+# length(sol_list)
+# sol_list[end].minimum
+# sol_list[end].u
 
 
-save_data = NetworkOptim.run_multi_obj_opt(RP);
+save_data = run_multi_obj_opt(RP);
 @show length(save_data.pf)
 @show fitness.(save_data.pf)
