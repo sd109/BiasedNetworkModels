@@ -83,6 +83,8 @@ end
 
 function update_x!(model, x, run_params)
 
+    fold_angles!(x, run_params) #Make sure all angles are in 1st quadrant
+
     #Sanity check
     expected_length = 0
     if run_params.WithEs 
@@ -116,8 +118,8 @@ function update_x!(model, x, run_params)
 
     if run_params.WithDipoles
         new_dipole_angles = x[i_start:end]
-        new_θs = new_dipole_angles[1:2:end] .% π #Make sure angles are within [-π, π]
-        new_ϕs = new_dipole_angles[2:2:end] .% π/2 #Make sure angles are within [-π/2, π/2]
+        new_θs = new_dipole_angles[1:2:end]
+        new_ϕs = new_dipole_angles[2:2:end]
         for (site, θ, ϕ) in zip(run_params.DipoleVarSites, new_θs, new_ϕs)
             vary_dipole_orientation!(model, site, CartesianFromSpherical()(Spherical(1, θ, ϕ))..., update_H=false, update_L=false)
         end
@@ -191,12 +193,12 @@ perturb_x(model, RP; kwargs...) = perturb_x!(copy(model), RP; kwargs...)
 
 
 #Makes sure all polar angles are within [-π, π] & all azimuth angles within [-π/2, π/2]
-function fold_angles(x, RP)
+function fold_angles!(x, RP)
 
     #If dipoles aren't included in x then just return to caller
     !(RP.WithDipoles) && return x
 
-    new_x = copy(x) #Avoid mutating input vec
+    # new_x = copy(x) #Avoid mutating input vec
     idx = 1 #idx of first angle in x vec
 
     if RP.WithEs
@@ -208,23 +210,33 @@ function fold_angles(x, RP)
     end
 
     #Check idx looks correct
-    @assert length(new_x[idx:end]) == 2*length(RP.DipoleVarSites)
+    @assert length(x[idx:end]) == 2*length(RP.DipoleVarSites)
 
-    #Rescale angles
-    new_x[idx:2:end] .%= π
-    new_x[idx+1:2:end] .%= π/2
+    #Rescale angles (can't just do % π, π/2 due to coordinate conventions chosen in CoordinateTransformations.jl)
+    θs = x[idx:2:end]
+    ϕs = x[idx+1:2:end]
+    x[idx:end] = reduce(vcat, map((θ, ϕ) -> (p = SphericalFromCartesian()(CartesianFromSpherical()(Spherical(1, θ, ϕ))); [p.θ, p.ϕ]), θs, ϕs))
+    # @show θs, ϕs, x[idx:end]
 
-    return new_x
+    return x
 end
 
 
-function FIM_params(model, run_params)
+function system_FIM_params(model, run_params)
     FIM_params = DiffParam[]
     run_params.WithEs && append!(FIM_params, SiteEnergyDeriv(model, 1))
     run_params.WithSep && push!(FIM_params, InterchainCouplingDeriv(model, 1))
     run_params.WithDipoles && append!(FIM_params, DipoleAngleDeriv(model, 1))
     return FIM_params
 end
+
+# function env_FIM_params(model, run_params)
+#     FIM_params = DiffParam[
+
+#     ]
+#     return FIM_params
+# end
+
 
 
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -234,7 +246,7 @@ end
 
 function current_and_QFIM_trace(model::OQSmodel, run_params::NamedTuple, I_ref::Real)#::Tuple{Float64, Float64}
     Iss = ss_current(model)
-    QFIM = QuantumFIM(model, steady_state, FIM_params(model, run_params))::Matrix{ComplexF64} #Annotate return type
+    QFIM = QuantumFIM(model, steady_state, system_FIM_params(model, run_params))::Matrix{ComplexF64} #Annotate return type
     return (-Iss/I_ref, real(tr(QFIM))) #Use -ve Iss since we want to maximize this value
 end
 
@@ -330,13 +342,12 @@ run_ensemble_opt(m::OQSmodel, RP::NamedTuple; kwargs...) = run_ensemble_opt(m, R
 
 
 
-function run_multi_obj_opt(RP::NamedTuple; obj_func=current_and_QFIM_trace, trace_interval=600, kwargs...) #kwargs are passed to run_ensemble_opt
+function run_multi_obj_opt(RP::NamedTuple; start_model=create_init_model(RP), obj_func=current_and_QFIM_trace, trace_interval=600, kwargs...) #kwargs are passed to run_ensemble_opt
 
     #Check that we wont overwrite existing results
     any(isfile.(RP.SaveName .* ["-res.sjl", "-res-bak.txt", "-trace.txt", "-res.jld2"])) && error("File name already exists - move existing file or choose different save name.")
 
-    start_model = create_init_model(RP)
-    I_ref = ss_current(start_model)
+    I_ref = ss_current(start_model) #Reference current for enhancement factors
 
     #Set search range for multi-obj opt automatically if it's not set
     if RP.SearchRange === nothing
@@ -405,7 +416,7 @@ function run_multi_obj_opt(RP::NamedTuple; obj_func=current_and_QFIM_trace, trac
         );
 
         #Add ensemble opt results to starting population
-        candidates = [fold_angles(sol.minimizer, RP) for sol in sol_list]
+        candidates = [fold_angles!(copy(sol.minimizer), RP) for sol in sol_list]
         viable_candidates = [c for c in candidates if in_search_range(c, RP)]
         a, b = length(viable_candidates), length(sol_list)
         if a < 0.1*b

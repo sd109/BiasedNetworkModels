@@ -63,13 +63,14 @@ function BiasedNetworkModel(H;
         γ_inj = 1e-6,
         γ_ext = 3e-2,
         γ_decay = 2e-2,
-        γ_nr = 1e-3,
+        γ_nr = 1e-4,
         simple_spectra = true,
         T_cold = 0, # Only used if simple_spectra = false 
         T_hot = 20*2.5875, # Only used if simple_spectra = false 
         rescale_inj = true,
         rescale_ext = false,
         rescale_decay = false,
+        rescale_nr = false,
         eigen_inj = false,
         eigen_ext = false,
     )
@@ -101,14 +102,14 @@ function BiasedNetworkModel(H;
         for (i, a) in enumerate(["x", "y", "z"])
             op_list = [transition(Float64, b, ground.idx, i) + transition(Float64, b, i, ground.idx) for i in 1:numsites(H)]
             weightings = getindex.(site_dipoles, i)
-            push!(decay_procs, CollectiveInteractionOp("decay_$a", op_list, weightings, SpectralDensity(spectral_func, (T=T_cold, rate=γ_decay))))
+            push!(decay_procs, CollectiveInteractionOp("rad_decay_$a", op_list, weightings, SpectralDensity(spectral_func, (T=T_cold, rate=γ_decay))))
         end
 
     else
         #Single collective decay
         decay_op = sum(transition(Float64, b, ground.idx, i) + transition(Float64, b, i, ground.idx) for i in 1:numsites(H)) #Collective decay op
         spectral_func = simple_spectra ? Sw_flat_down : Sw_flat
-        decay_procs = [InteractionOp("decay", decay_op, SpectralDensity(spectral_func, (T=T_cold, rate=γ_decay)))]
+        decay_procs = [InteractionOp("rad_decay_", decay_op, SpectralDensity(spectral_func, (T=T_cold, rate=γ_decay)))]
     end
 
     #Non-radiative decay

@@ -163,9 +163,9 @@ function vary_dipole_orientation!(m::OQSmodel, site, dx, dy, dz; update_H=true, 
     update_H && (m.Ham = update_H!(m.Ham)) #Recalculate H with updated param_dict
 
     #Update collective decay env processes
-    m.env_processes[Symbol("decay_x")].weightings[site] = dx
-    m.env_processes[Symbol("decay_y")].weightings[site] = dy
-    m.env_processes[Symbol("decay_z")].weightings[site] = dz
+    m.env_processes[Symbol("rad_decay_x")].weightings[site] = dx
+    m.env_processes[Symbol("rad_decay_y")].weightings[site] = dy
+    m.env_processes[Symbol("rad_decay_z")].weightings[site] = dz
 
     update_L && (m.L = transport_generator(m))
 
@@ -296,7 +296,7 @@ DipoleAngleDeriv(m::OQSmodel, scale::Real) = DipoleAngleDeriv(m, 1:numsites(m), 
 #                                               Useful analysis utilities                                              #
 # -------------------------------------------------------------------------------------------------------------------- #
 
-get_decay_ops(m::OQSmodel) = m.Ham.coupling_func == full_dipole_coupling ? oper.([m.env_processes[Symbol("decay_$a")] for a in ["x", "y", "z"]]) : oper.([m.env_processes.decay])
+get_decay_ops(m::OQSmodel) = m.Ham.coupling_func == full_dipole_coupling ? oper.([m.env_processes[Symbol("rad_decay_$a")] for a in ["x", "y", "z"]]) : oper.([m.env_processes.rad_decay])
 
 export eigenstate_brightness
 function eigenstate_brightness(m::OQSmodel)
