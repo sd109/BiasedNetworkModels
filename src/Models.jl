@@ -118,7 +118,7 @@ function BiasedNetworkModel(H;
 
     #Phonons
 
-    #Old version
+    #Old version of ω0 calc
     # dE_ratio = H.param_dict["E1"] - H.param_dict["E2"]
     # ω0=sqrt(dE_ratio^2 - Γ_phonon^2) 
 

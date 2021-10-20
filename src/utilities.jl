@@ -57,7 +57,7 @@ function ss_current(model::OQSmodel; ss=steady_state(model), single_ex_tol=0.5):
         inj_rate = model.env_processes.inject_1.spectrum.args.γ
         err_str = "Steady state population of ground state = $(Pss[end])\n"
         err_str *= "--> single excitation approximation possibly inaccurate? (Try lowering γ_inj from current value of $(inj_rate))"
-        err_str *= "\nCurrent interchain_coupling = $(get_interchain_coupling(model))"
+        model.Ham.num_chains > 1 && (err_str *= "\nCurrent interchain_coupling = $(get_interchain_coupling(model))")
         if model.options.err_on_nonphysical
             throw(error(err_str))
         else
