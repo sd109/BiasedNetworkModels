@@ -59,7 +59,7 @@ function BiasedNetworkModel(H;
         γ_phonon = 3e-2,
         Γ_phonon = 0.4,
         T_phonon = 2.5875, # = 300 K if NN coupling is 10 meV
-        ω0 = nothing, #Calcuated based on eigen-energy differences by default
+        ω0 = :single_chain_opt, # Calculated as √(dE^2 - Γ_phonon^2) by default (i.e. maximize single chain efficiency)
         γ_inj = 1e-6,
         γ_ext = 2.1e-2,
         γ_decay = 2e-2,
@@ -117,13 +117,15 @@ function BiasedNetworkModel(H;
     nr_decay_procs = [InteractionOp("nr_decay_$i", transition(Float64, b, ground.idx, i) + transition(Float64, b, i, ground.idx), SpectralDensity(spectral_func, (T=T_cold, rate=γ_nr))) for i in 1:numsites(H)]
 
     #Phonons
-
-    #Old version of ω0 calc
-    # dE_ratio = H.param_dict["E1"] - H.param_dict["E2"]
-    # ω0=sqrt(dE_ratio^2 - Γ_phonon^2) 
-
+    if ω0 == :single_chain_opt #Work out ω0 value
+        dE_ratio = H.param_dict["E1"] - H.param_dict["E2"]
+        ω0=sqrt(dE_ratio^2 - Γ_phonon^2) 
+    elseif ω0 == :eigenfreq_mean
+        ω0 = mean(diff(eigen_Es[2:end]))        
+    elseif !(typeof(ω0) <: Real)
+        error("Unrecognized ω0 specification")
+    end
     deph_ops = OQSmodels.site_dephasing_ops(H)
-    ω0 === nothing && (ω0 = mean(diff(eigen_Es[2:end])))
     Sw = SpectralDensity(rescaled_Sw_drude_lorentz, (T=T_phonon, Γ=Γ_phonon, ω0=ω0, γ=γ_phonon))
     deph_procs = [InteractionOp("phonons_$i", op, Sw) for (i, op) in enumerate(deph_ops)]
 
