@@ -245,7 +245,6 @@ get_dipole_components(m::OQSmodel) = [get_dipole_components(m, s) for s in 1:num
 
 get_dipole_sphericals(m::OQSmodel, site::Int) = SphericalFromCartesian()(get_dipole_components(m, site))
 
-# get_dipole_angles(m::OQSmodel, site::Int) = (d = get_dipole_sphericals(m, site); [d.θ % π, d.ϕ % π/2]) #Use modulo ensure we don't end up with arbitrarily large angles (CoordinateTransformations uses -π<θ<π & -π/2<ϕ<π/2)
 get_dipole_angles(m::OQSmodel, site::Int) = (d = get_dipole_sphericals(m, site); [d.θ, d.ϕ]) #Don't need to use modulo here since CoordinateTransformations.jl will enforce first quadrant constraints internally
 
 get_dipole_angles(m::OQSmodel) = [get_dipole_angles(m, site) for site in 1:numsites(m)]
@@ -253,7 +252,7 @@ get_dipole_angles(m::OQSmodel) = [get_dipole_angles(m, site) for site in 1:numsi
 
 function vary_dipole_θ!(m, site, θ; kwargs...)
     d = get_dipole_sphericals(m, site) #Get existing dipole orientation
-    dx, dy, dz = CartesianFromSpherical()(Spherical(d.r, θ % π, d.ϕ)) #Get cartesian components of new dipole orientation (use % π to ensure perturbed angles remain in first quadrant)
+    dx, dy, dz = CartesianFromSpherical()(Spherical(d.r, θ, d.ϕ)) #Get cartesian components of new dipole orientation
     return vary_dipole_orientation!(m, site, dx, dy, dz; kwargs...)
 end
 
@@ -262,7 +261,7 @@ vary_dipole_θ(m, site, θ; kwargs...) = vary_dipole_θ!(copy(m), site, θ; kwar
 
 function vary_dipole_ϕ!(m, site, ϕ; kwargs...)
     d = get_dipole_sphericals(m, site) #Get existing dipole orientation
-    dx, dy, dz = CartesianFromSpherical()(Spherical(d.r, d.θ, ϕ % π/2 )) #Get cartesian components of new dipole orientation (use % π/2 to ensure perturbed angles remain in first quadrant)
+    dx, dy, dz = CartesianFromSpherical()(Spherical(d.r, d.θ, ϕ)) #Get cartesian components of new dipole orientation
     return vary_dipole_orientation!(m, site, dx, dy, dz; kwargs...)
 end
 #Non-mutating version
@@ -313,3 +312,137 @@ end
 
 export ss_emission_rates
 ss_emission_rates(m::OQSmodel; kwargs...) = eigenstate_brightness(m) .* eigen_populations(m; kwargs...)[2:end]
+
+
+
+# -------------------------------------------------------------------------------------------------------------------- #
+#                                               Useful plotting functions                                              #
+# -------------------------------------------------------------------------------------------------------------------- #
+
+import PyPlot as plt
+using PyCall
+# In-module workaround needed due to everything in python being a pointer (see https://github.com/JuliaPy/PyCall.jl#using-pycall-from-julia-modules)
+const mpl = PyNULL()
+function __init__()
+    copy!(mpl, pyimport("matplotlib"))
+end
+
+function plot_site_energies_pyplot!(ax, Es::AbstractArray; Iss=nothing, pops=nothing, dx=0.4, dy=0.1)
+    colours = pops === nothing ? "k" : (pops .- minimum(pops)) / (maximum(pops) - minimum(pops)) 
+    my_cmap = plt.LinearSegmentedColormap.from_list("test", ["blue", "orange"], N=256)
+    rect_verts = [(-dx, -dy), (dx, -dy), (dx, dy), (-dx, dy)]
+    out = ax.scatter(1:length(Es), Es, marker=rect_verts, s=5000/length(Es), c=colours, cmap=my_cmap) #"winter")
+    ax.set_ylabel("Site Energy (eV)", size=12)
+    Iss !== nothing && ax.set_title("\$ I_{ss} = $(round(Iss, sigdigits=3)) \$", size=12)
+    return out
+end
+
+#Version which calculates pops from model
+function plot_site_energies_pyplot!(ax, m::OQSmodel; kwargs...)
+    ss_pops = populations(steady_state(m))[1:numsites(m)]
+    return plot_site_energies_pyplot!(ax, site_energies(m); Iss=ss_current(m), pops=ss_pops, kwargs...)
+end
+
+
+select_marker(x) = real(x) > 0 ? "^" : "v" #Selects upwards or downward triangle to denote eigenstate phase
+
+function plot_eigenstate_structure_pyplot!(axs, m::OQSmodel; ss=steady_state(m), log_brightness=true) #Can provide pre-calulated steady state as kwarg for efficiency
+   
+    ax1, ax2 = axs #Unpack axis pair
+    #Calc some relevant physical quantities
+    N = numsites(m)
+    H_eigvals, H_eigenstates = eigenstates(dense(m.Ham.op)) 
+    H_eigenstates = H_eigenstates[2:end] #Drop ground states (assuming they're the lowest energy states)
+    H_eigvals = H_eigvals[2:end]
+        
+    # ss = steady_state(m) #Moved to kwarg
+    eb_pops = [real(dagger(st) * ss * st) for st in H_eigenstates]
+
+    brightness = eigenstate_brightness(m)
+    log_brightness && (brightness = log10.(brightness))
+    scaled_brightness = (brightness .- minimum(brightness)) / (maximum(brightness) - minimum(brightness))
+    brightness_cmap = plt.LinearSegmentedColormap.from_list("brightnesses", ["k", "yellow"], N=256) #plt.cm.autumn #cgrad([:black, :yellow])
+    
+    #Add main scatter points
+    for i in 1:N
+        overlaps = [abs2(dagger(H_eigenstates[i])*nlevelstate(basis(m), j)) for j in 1:numsites(m)]
+        real(H_eigenstates[i].data[1]) < 0 && (H_eigenstates[i] *= -1) #Fix first component as +ve to avoid arb. relative phase 'flip-flopping'
+        phase_markers = select_marker.(H_eigenstates[i].data[1:N])
+        colour = brightness_cmap(scaled_brightness[i])
+        for j in 1:N #Need second loop to get different (up/down triangle) markers
+            ax1.scatter([j], [i], marker=phase_markers[j], s=200*overlaps[j], color=colour, zorder=10, edgecolor="k")
+        end
+    end
+    ax1.set_xlim(ax1.get_xlim() .- (0.08*numsites(m), 0)) #Aligns with top plot and makes space for energy spectrum
+    ax1.set_xticks(1:N)
+    ax1.set_yticks(1:N)
+    ax1.set_xticklabels(["1", fill("", N-2)..., "$N"])
+    xmin, xmax = ax1.get_xlim()
+    for i in 1:N #Manually add partial grid
+        ax1.axvline(i, c="grey", lw=0.5, ls="--", alpha=0.5, zorder=1)
+        ax1.plot([1, xmax], [i, i], c="grey", lw=0.5, ls="--", alpha=0.5, zorder=1)
+    end
+
+    #Add eigenenergy spectrum
+    d = (1 - xmin) #Distance from left edge of plot to start of eigenstate section
+    scaled_spectrum = (N-1)*(H_eigvals .- minimum(H_eigvals)) / (maximum(H_eigvals) - minimum(H_eigvals)) .+ 1
+    for i in 1:N
+        colour = brightness_cmap(scaled_brightness[i])
+        #Add energy value
+        ax1.plot(
+            [xmin + 0.35*d, xmin + 0.65*d], fill(scaled_spectrum[i], 2),
+            lw=50/N, c=colour, solid_capstyle="round",
+#             zorder=0.15 + 1e-2*i
+        )
+        #Add line connecting to eigenstate
+        ax1.plot([xmin+0.65d, 1], [scaled_spectrum[i], i], lw=0.5, ls=":", c="grey", zorder=0.1)
+    end
+    #Add y-axis labels
+    ax1.set_yticklabels([string(round(H_eigvals[1], sigdigits=3)), fill("", N-2)..., string(round(H_eigvals[end], sigdigits=3))])
+    ax1.set_ylabel("Hamiltonian eigenenergy (eV)", labelpad=-20, size=12)
+    
+    #Add horizontal bar plot of eigenstate populations
+    colours = [brightness_cmap(x) for x in scaled_brightness]
+    ax2.barh(1:length(eb_pops), eb_pops, color=colours, edgecolor="k", linewidth=1)    
+    ax2.set_xlabel("Eigenstate population", size=12, labelpad=12)
+    ax2.set_yticks([])
+    ax1.set_ylim(ax2.get_ylim()) #Align y axes
+    
+    #Add brightness colourbar
+    sm = plt.cm.ScalarMappable(cmap=brightness_cmap)
+    cbar = plt.colorbar(sm, ax=ax2, ticks=[0, 1])
+    if log_brightness
+        cbar.ax.set_yticklabels(string.(round.(extrema(brightness), sigdigits=3)))
+        cbar.ax.set_ylabel("Logarithmic eigenstate brightness", labelpad=-15, size=10)
+    else
+        cbar.ax.set_yticklabels(["0", "$(round(maximum(brightness), sigdigits=3))"])
+        cbar.ax.set_ylabel("Eigenstate brightness", labelpad=-15, size=10)
+    end
+
+end
+
+
+export summarize_transport_model_pyplot
+function summarize_transport_model_pyplot(m::OQSmodel; size=(10, 8), log_brightness=true, kwargs...)    
+    
+    #Initial layout setup
+    fig = plt.figure(figsize=size)
+    gs = mpl.gridspec.GridSpec(10, 16)
+    ax1 = fig.add_subplot(py"""$(gs)[0:3, 1:12]""")
+    ax1.set_xticks([])
+
+    #Plot site energies on top subplot
+    out = plot_site_energies_pyplot!(ax1, m; kwargs... )
+    cax1 = fig.add_subplot(py"""$(gs)[0:3, 12:13]""")
+    cbar1 = plt.colorbar(out, cax=cax1, ticks=[0, 1])
+    cbar1.ax.set_yticklabels(["0", "Max"])
+    cbar1.ax.set_ylabel("Site Population", labelpad=-15, size=10)
+        
+    ax2 = fig.add_subplot(py"""$(gs)[3:, 0:12]""")
+    ax3 = fig.add_subplot(py"""$(gs)[3:, 12:]""")
+    plot_eigenstate_structure_pyplot!([ax2, ax3], m; log_brightness=log_brightness)
+        
+#     plt.tight_layout()
+    fig.subplots_adjust(wspace=0.5, hspace=0.5)
+    return fig, [ax1, ax2, ax3]
+end

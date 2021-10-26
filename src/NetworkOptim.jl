@@ -162,8 +162,8 @@ function perturb_dipole_angles!(model; dis=1e-2, kwargs...)
 
     # all_angles = reduce(vcat, [get_dipole_angles(model, s) for s in 1:numsites(model)])
     all_angles = reduce(vcat, get_dipole_angles(model))
-    θs = all_angles[1:2:end] #.% π
-    ϕs = all_angles[2:2:end] #.% π/2
+    θs = all_angles[1:2:end]
+    ϕs = all_angles[2:2:end]
 
     for (site, (θ, ϕ)) in enumerate(zip(θs, ϕs))
         vary_dipole_θ!(model, site, θ + 2*π*dis*randn(); kwargs...)
@@ -212,11 +212,14 @@ function fold_angles!(x, RP)
     #Check idx looks correct
     @assert length(x[idx:end]) == 2*length(RP.DipoleVarSites)
 
-    #Rescale angles (can't just do % π, π/2 due to coordinate conventions chosen in CoordinateTransformations.jl)
+    #Rescale angles
+    #Can't just do % π, π/2 here due to coordinate conventions chosen in CoordinateTransformations.jl
+    #E.g. if θ = π then modulo π is 180° rotation which is wrong
+    #Modulo trick would only work for θ if CoordinateTransformations used conventions θ = [0, 2π]
+    #It will never work for ϕ because of discontinuity across ϕ = ± π/2
     θs = x[idx:2:end]
     ϕs = x[idx+1:2:end]
     x[idx:end] = reduce(vcat, map((θ, ϕ) -> (p = SphericalFromCartesian()(CartesianFromSpherical()(Spherical(1, θ, ϕ))); [p.θ, p.ϕ]), θs, ϕs))
-    # @show θs, ϕs, x[idx:end]
 
     return x
 end
@@ -361,8 +364,7 @@ function run_multi_obj_opt(RP::NamedTuple; start_model=create_init_model(RP), ob
             push!(SR, (1/cbrt(20), 1/cbrt(1e-3))) #Express limits in terms of maximal allowed (dimensionless) coupling
         end
         if RP.WithDipoles
-            append!(SR, repeat([(-π, π), (-π/2, π/2)], outer=length(RP.DipoleVarSites))) #Allow θs within [-π, π] and ϕs within [-π/2, π/2] (allow 10% outside either way)
-            # append!(SR, repeat([ 1.1 .* (-π, π), 1.1 .* (-π/2, π/2)], outer=length(RP.DipoleVarSites))) #Allow θs within [-π, π] and ϕs within [-π/2, π/2] (allow 10% outside either way)
+            append!(SR, repeat([(-π, π), (-π/2, π/2)], outer=length(RP.DipoleVarSites))) #Allow θs within [-π, π] and ϕs within [-π/2, π/2]
         end
 
         RP = (RP..., SearchRange = SR) #Store search range in run params
@@ -443,8 +445,8 @@ function run_multi_obj_opt(RP::NamedTuple; start_model=create_init_model(RP), ob
         save_data = (
             start_model = start_model,
             run_params = RP,
-            sol_list = sol_list,
-            # single_obj_opts = [(sol.minimum, sol.minimizer) for sol in sol_list],
+            # sol_list = sol_list,
+            sol_list = [(min=sol.minimum, params=sol.minimizer) for sol in sol_list],
             pf = PF,
             MOO_starting_candidates = viable_candidates,
             # MOO_opt_params = res.parameters,

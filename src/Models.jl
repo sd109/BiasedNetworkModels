@@ -118,7 +118,7 @@ function BiasedNetworkModel(H;
 
     #Phonons
     if ω0 == :single_chain_opt #Work out ω0 value
-        dE_ratio = H.param_dict["E1"] - H.param_dict["E2"]
+        dE_ratio = H.param_dict["E1"] - H.param_dict["E2"] #Is there a better way to specify dE_ratio?
         ω0=sqrt(dE_ratio^2 - Γ_phonon^2) 
     elseif ω0 == :eigenfreq_mean
         ω0 = mean(diff(eigen_Es[2:end]))        
