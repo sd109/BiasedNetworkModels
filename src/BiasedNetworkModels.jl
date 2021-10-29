@@ -1,7 +1,7 @@
 module BiasedNetworkModels
 
 
-using LinearAlgebra, Statistics, StaticArrays, Rotations, CoordinateTransformations, QuantumOptics, OQSmodels
+using LinearAlgebra, Random, Statistics, StaticArrays, Rotations, CoordinateTransformations, QuantumOptics, OQSmodels
 using IterTools: subsets
 using FiniteDiff: finite_difference_derivative
 using Statistics: mean
@@ -18,7 +18,7 @@ include("Hamiltonians.jl")
 
 
 include("Models.jl")
-export BiasedSheetModel, BiasedPrismModel, BiasedRingModel
+export BiasedSheetModel, BiasedPrismModel, BiasedRingModel, MultiRingModel
 
 
 using ClassicalAndQuantumFIMs, Optim, GalacticOptim, BlackBoxOptim, JLD2, Serialization, Logging, Dates, ThreadsX #NetworkOptim specific imports

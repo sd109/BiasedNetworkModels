@@ -51,14 +51,14 @@ end
 
 
 
-function create_init_model(run_params)
+function create_init_model(run_params; kwargs...) #kwargs can be used to set non-standard env params
 
     if run_params.Geom == :sheet
-        return BiasedSheetModel(run_params.ChainLength, run_params.NumChains, run_params.dE_ratio; interchain_coupling=1/run_params.ChainSep^3, coupling_func=run_params.CouplingFunc)
+        return BiasedSheetModel(run_params.ChainLength, run_params.NumChains, run_params.dE_ratio; interchain_coupling=1/run_params.ChainSep^3, coupling_func=run_params.CouplingFunc, kwargs...)
     elseif run_params.Geom == :prism
-        return BiasedPrismModel(run_params.ChainLength, run_params.NumChains, run_params.dE_ratio; interchain_coupling=1/run_params.ChainSep^3, coupling_func=run_params.CouplingFunc)
+        return BiasedPrismModel(run_params.ChainLength, run_params.NumChains, run_params.dE_ratio; interchain_coupling=1/run_params.ChainSep^3, coupling_func=run_params.CouplingFunc, kwargs...)
     elseif occursin("ring", string(run_params.Geom))
-        return BiasedRingModel(run_params.ChainLength, run_params.dE_ratio, run_params.Geom; coupling_func=run_params.CouplingFunc)
+        return BiasedRingModel(run_params.ChainLength, run_params.dE_ratio, run_params.Geom; coupling_func=run_params.CouplingFunc, kwargs...)
     else
         error("Could not create starting model for geom: $(run_params.Geom)")
     end

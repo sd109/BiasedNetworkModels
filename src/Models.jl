@@ -48,6 +48,23 @@ function BiasedRingModel(num_sites, dE, geom_type;
 end
 
 
+#Convenience method for constructing multi-ring models
+function MultiRingModel(sites_per_ring::Int, N_rings::Int, ring_spacing::Real; 
+     E0=100.0, coupling_func=full_dipole_coupling, E_dis=0, rng_seed=nothing,
+     dipole_orientations = [SVector(0, 0, 1) for i in 1:sites_per_ring*N_rings], #Default is all dipoles parallel and pointing out of x-y plane
+     kwargs... #kwargs are passed to BiasedNetworkModel
+    )
+
+    H = MultiRingHamiltonian(sites_per_ring, N_rings, ring_spacing; E0=E0, coupling_func=coupling_func, E_dis=E_dis, rng_seed=rng_seed, dipole_orientations=dipole_orientations)
+
+    inj_site = 1 #Left-most site on first ring
+    ext_site = sites_per_ring * (N_rings-1) + sites_per_ring ÷ 2 + 1 #Right-most site on last ring
+
+    return BiasedNetworkModel(H, inj_sites=[inj_site], ext_sites=[ext_site]; kwargs...)
+end
+
+
+
 
 #Main model constructor
 function BiasedNetworkModel(H;
@@ -74,7 +91,6 @@ function BiasedNetworkModel(H;
         eigen_inj = false,
         eigen_ext = false,
     )
-
 
     #Sanity check on eigen-energies - if inter-site couplings get too strong then eigenenergies can become < 0 which messes up injection / extraction processes
     eigen_Es, U = eigen(Array(H.op.data))
@@ -132,6 +148,7 @@ function BiasedNetworkModel(H;
     #Injection processes
     spectral_func = simple_spectra ? Sw_flat_up : Sw_flat
     if eigen_inj
+        H.geom_type == :multi_ring && error("Eigenbasis injection and extraction not implemented for multi-ring geometries") 
         op =  Operator(b, U * (transition(Float64, b, b.N, 1) + transition(Float64, b, 1, b.N)).data * inv(U)) # b.N is highest energy eigenstate and 1 is ground (eigen)state
         inj_procs = [InteractionOp("inject_eb", op, SpectralDensity(spectral_func, (T=T_hot, γ=γ_inj)))]
     else
@@ -141,6 +158,7 @@ function BiasedNetworkModel(H;
     #Extraction processes
     spectral_func = simple_spectra ? Sw_flat_down : Sw_flat
     if eigen_ext
+        H.geom_type == :multi_ring && error("Eigenbasis injection and extraction not implemented for multi-ring geometries") 
         op = Operator(b, U * (transition(Float64, b, 1, 2) + transition(Float64, b, 2, 1)).data * inv(U)) # '2' is lowest energy system eigenstate and 1 is ground (eigen)state
         ext_procs = [InteractionOp("extract_eb", op, SpectralDensity(spectral_func, (T=T_cold, γ=γ_ext)))]
     else

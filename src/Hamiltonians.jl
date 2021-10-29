@@ -120,8 +120,25 @@ end
 # end
 
 
-# function BiasedMultiRingHamiltonian()
-# end
+function MultiRingHamiltonian(sites_per_ring::Int, N_rings::Int, ring_spacing::Real; #Ring spacing is in multiples of single ring radius
+     E0=100.0, coupling_func=full_dipole_coupling, E_dis=0, rng_seed=nothing,
+     dipole_orientations = [SVector(0, 0, 1) for i in 1:sites_per_ring*N_rings] #Default is all dipoles parallel and pointing out of x-y plane
+    )
+
+    #Create site energies
+    rng_seed !== nothing && Random.seed!(rng_seed) #Use to get reproducible random disorder
+    Es = E0 * (1 .+ E_dis/E0*randn(sites_per_ring*N_rings)) #Divide E_dis by E0 to avoid scaling disorder magnitude with E0
+
+    #Create single ring site positions (centered on origin)
+    R = R_from_nn_dist(sites_per_ring, 1)
+    # ring_pos = [CartesianFromCylindrical()(Cylindrical(R, θ, 0)) for θ in range(2π/sites_per_ring, 2*π, length=sites_per_ring)]
+    ring_pos = [CartesianFromCylindrical()(Cylindrical(R, θ, 0)) for θ in range(-π, π - 2π/sites_per_ring, length=sites_per_ring)]
+
+    #Duplicate rings and shift them along the x-axis
+    site_pos = reduce(vcat, [ring_pos .+ fill([i*ring_spacing*R, 0, 0], sites_per_ring) for i in 0:N_rings-1])
+    
+    return BiasedNetworkHamiltonian(sites_per_ring, N_rings, Es, site_pos, coupling_func, dipole_orientations, :multi_ring)
+end
 
 
 
