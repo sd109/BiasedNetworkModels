@@ -3,12 +3,12 @@
 const default_run_params = (
     #Essentials
     SaveName = "test",
-    ChainLength = 12,
-    NumChains = 2,
-    dE_ratio = 1.0,
-    ChainSep = 1.0,
-    CouplingFunc = distance_only_coupling,
-    Geom = :sheet,
+    # ChainLength = 12,
+    # NumChains = 2,
+    # dE_ratio = 1.0,
+    # ChainSep = 1.0,
+    # CouplingFunc = distance_only_coupling,
+    # Geom = :sheet,
 
     #Optimization params
     WithEs = true,
@@ -24,7 +24,7 @@ const default_run_params = (
     SearchRange = nothing,
 )
 
-function create_run_params(; kwargs...) #kwargs are used to overwrite defaults
+function create_run_params(m::OQSmodel; kwargs...) #kwargs are used to overwrite defaults
 
     RP = (; default_run_params..., kwargs...) #Create named tuple 
 
@@ -33,10 +33,14 @@ function create_run_params(; kwargs...) #kwargs are used to overwrite defaults
         !(k in keys(default_run_params)) && error("Key '$(k)' not found in default run params.")
     end
 
+    #Deduce some other params if not set
+    # (RP.WithDipoles && RP.DipoleVarSites === nothing) && (RP = (; RP..., DipoleVarSites = 1:numsites(m)))
+
+
     #Sanity checks
     (RP.WithEs && RP.EnergyVarSites === nothing) && error("Need to provide EnergyVarSites or set WithEs = false")
     (!RP.WithEs && RP.EnergyVarSites !== nothing) && error("Need to set WithEs = true when providing EnergyVarSites")
-    (RP.WithSep && RP.NumChains < 2) && error("Optimizing chain separation makes no sense for a single chain...")
+    (RP.WithSep && m.num_chains < 2) && error("Optimizing chain separation makes no sense for a single chain...")
     (RP.WithDipoles && RP.DipoleVarSites === nothing) && error("Need to provide DipoleVarSites or set WithDipoles = false")
     (!RP.WithDipoles && RP.DipoleVarSites !== nothing) && error("Need to set WithDipoles = true when providing DipoleVarSites")
 
@@ -51,18 +55,18 @@ end
 
 
 
-function create_init_model(run_params; kwargs...) #kwargs can be used to set non-standard env params
+# function create_init_model(run_params; kwargs...) #kwargs can be used to set non-standard env params
 
-    if run_params.Geom == :sheet
-        return BiasedSheetModel(run_params.ChainLength, run_params.NumChains, run_params.dE_ratio; interchain_coupling=1/run_params.ChainSep^3, coupling_func=run_params.CouplingFunc, kwargs...)
-    elseif run_params.Geom == :prism
-        return BiasedPrismModel(run_params.ChainLength, run_params.NumChains, run_params.dE_ratio; interchain_coupling=1/run_params.ChainSep^3, coupling_func=run_params.CouplingFunc, kwargs...)
-    elseif occursin("ring", string(run_params.Geom))
-        return BiasedRingModel(run_params.ChainLength, run_params.dE_ratio, run_params.Geom; coupling_func=run_params.CouplingFunc, kwargs...)
-    else
-        error("Could not create starting model for geom: $(run_params.Geom)")
-    end
-end
+#     if run_params.Geom == :sheet
+#         return BiasedSheetModel(run_params.ChainLength, run_params.NumChains, run_params.dE_ratio; interchain_coupling=1/run_params.ChainSep^3, coupling_func=run_params.CouplingFunc, kwargs...)
+#     elseif run_params.Geom == :prism
+#         return BiasedPrismModel(run_params.ChainLength, run_params.NumChains, run_params.dE_ratio; interchain_coupling=1/run_params.ChainSep^3, coupling_func=run_params.CouplingFunc, kwargs...)
+#     elseif occursin("ring", string(run_params.Geom))
+#         return BiasedRingModel(run_params.ChainLength, run_params.dE_ratio, run_params.Geom; coupling_func=run_params.CouplingFunc, kwargs...)
+#     else
+#         error("Could not create starting model for geom: $(run_params.Geom)")
+#     end
+# end
 
 
 function get_x(model, run_params)
