@@ -117,7 +117,7 @@ function BiasedNetworkModel(H;
         decay_procs = []
         for (i, a) in enumerate(["x", "y", "z"])
             op_list = [transition(Float64, b, ground.idx, i) + transition(Float64, b, i, ground.idx) for i in 1:numsites(H)]
-            weightings = getindex.(site_dipoles, i)
+            weightings = abs.(getindex.(site_dipoles, i)) #Make sure we take |d| here, otherwise dark states are bright states and vice versa which is physically incorrect
             push!(decay_procs, CollectiveInteractionOp("rad_decay_$a", op_list, weightings, SpectralDensity(spectral_func, (T=T_cold, rate=γ_decay))))
         end
 
