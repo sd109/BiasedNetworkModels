@@ -302,6 +302,7 @@ function eigenstate_brightness(m::OQSmodel)
     _, eigstates = eigenstates(m.Ham.op) #Drop ground state (idx 1)
     gs = nlevelstate(basis(m.Ham), get_env_state(m.Ham, "ground").idx)
     return [sum(abs2(dagger(gs) * op * st) for op in get_decay_ops(m)) for st in eigstates[2:end]]
+    # return [abs2(dagger(gs) * sum(get_decay_ops(m)) * st) for st in eigstates[2:end]]
 end
 
 export eigen_populations
