@@ -44,7 +44,7 @@ rescaled_Sw_drude_lorentz(w, T, Γ, ωc, γ) =  w == 0 ? 0 : π*γ*Γ*abs(w) / (
 # -------------------------------------------- Transport-related functions ------------------------------------------- #
 
 
-function ss_current(model::OQSmodel; ss=steady_state(model), single_ex_tol=0.5)::Float64
+function ss_current(model::OQSmodel; ss=steady_state(model), single_ex_tol=0.5, warn=true)::Float64
 
     Pss = populations(ss)
 
@@ -81,7 +81,7 @@ function ss_current(model::OQSmodel; ss=steady_state(model), single_ex_tol=0.5):
             rate*Pss[site]            
         end
 
-        Iss < 1e-12 && @warn "Steady state current = $(round(Iss, sigdigits=3)) ---> further calculations based on this value may be numerically unstable."
+        (warn && Iss < 1e-12) && @warn "Steady state current = $(round(Iss, sigdigits=3)) ---> further calculations based on this value may be numerically unstable."
 
         return Iss #::Float64 #This branch is not type stable (idk why...) so annotate type <- do this at function line instead
     end
@@ -301,8 +301,8 @@ export eigenstate_brightness
 function eigenstate_brightness(m::OQSmodel)
     _, eigstates = eigenstates(m.Ham.op) #Drop ground state (idx 1)
     gs = nlevelstate(basis(m.Ham), get_env_state(m.Ham, "ground").idx)
-    return [sum(abs2(dagger(gs) * op * st) for op in get_decay_ops(m)) for st in eigstates[2:end]]
-    # return [abs2(dagger(gs) * sum(get_decay_ops(m)) * st) for st in eigstates[2:end]]
+    # return [sum(abs2(dagger(gs) * op * st) for op in get_decay_ops(m)) for st in eigstates[2:end]]
+    return [abs2(dagger(gs) * sum(get_decay_ops(m)) * st) for st in eigstates[2:end]]
 end
 
 export eigen_populations
@@ -312,8 +312,17 @@ function eigen_populations(m::OQSmodel; ss=steady_state(m).data)
 end
 
 export ss_emission_rates
-ss_emission_rates(m::OQSmodel; kwargs...) = eigenstate_brightness(m) .* eigen_populations(m; kwargs...)[2:end]
+function ss_emission_rates(m::OQSmodel; kwargs...)
 
+    #Assume all radiative decay processes have the same rate
+    Ks = string.(keys(m.env_processes))
+    # k = m.Ham.coupling_func == distance_only_coupling ? :decay : Symbol(Ks[findfirst(occursin.("rad_decay_", Ks))])
+    k = Symbol(Ks[findfirst(occursin.("rad_decay", Ks))])
+    rate = m.env_processes[k].spectrum.args.rate
+
+    # return rate * eigenstate_brightness(m) .* normalize!(eigen_populations(m; kwargs...)[2:end])
+    return rate * eigenstate_brightness(m) .* eigen_populations(m; kwargs...)[2:end]
+end
 
 
 # -------------------------------------------------------------------------------------------------------------------- #

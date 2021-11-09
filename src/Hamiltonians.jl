@@ -52,7 +52,8 @@ function BiasedSheetHamiltonian(chain_length::Int, num_chains::Int, dE::Real;
 
     #Store each real pos (x, y, z) and dipole orientation (x, y, z) as StaticArrays.SVector instances for efficiency
     #(First 'for' loop is actually run second in for list comprehensions in Julia, just like python)
-    site_pos = [SVector(i, j/cbrt(interchain_coupling), 0) for j in 0:num_chains-1 for i in 0:chain_length-1]
+    # site_pos = [SVector(i, j/cbrt(interchain_coupling), 0) for j in 0:num_chains-1 for i in 0:chain_length-1]
+    site_pos = [SVector(j/cbrt(interchain_coupling), 0, i) for j in 0:num_chains-1 for i in 0:chain_length-1]
 
     return BiasedNetworkHamiltonian(chain_length, num_chains, Es, site_pos, coupling_func, dipole_orientations, :sheet)
 end

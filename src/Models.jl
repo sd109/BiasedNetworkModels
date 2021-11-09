@@ -126,7 +126,7 @@ function BiasedNetworkModel(H;
         #Single collective decay
         decay_op = sum(transition(Float64, b, ground.idx, i) + transition(Float64, b, i, ground.idx) for i in 1:numsites(H)) #Collective decay op
         spectral_func = simple_spectra ? Sw_flat_down : Sw_flat
-        decay_procs = [InteractionOp("rad_decay_", decay_op, SpectralDensity(spectral_func, (T=T_cold, rate=γ_decay)))]
+        decay_procs = [InteractionOp("rad_decay", decay_op, SpectralDensity(spectral_func, (T=T_cold, rate=γ_decay)))]
     end
 
     #Non-radiative decay
