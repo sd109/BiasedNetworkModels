@@ -39,11 +39,11 @@ end
 
 function BiasedSheetHamiltonian(chain_length::Int, num_chains::Int, dE::Real;
      interchain_coupling=1.0, E0=100.0, coupling_func=full_dipole_coupling,
-     dipole_orientations = [SVector(0, 0, 1) for i in 1:chain_length*num_chains] #Default is all dipoles parallel and pointing out of x-y plane
+     dipole_orientations = [SVector(0, 1, 0) for i in 1:chain_length*num_chains] #Default is all dipoles parallel and pointing out of x-z plane
     )
 
     #Sanity check
-    if coupling_func != full_dipole_coupling && dipole_orientations != [SVector(0, 0, 1) for i in 1:chain_length*num_chains]
+    if coupling_func != full_dipole_coupling && dipole_orientations != [SVector(0, 1, 0) for i in 1:chain_length*num_chains]
         @warn "It looks like you have provided some non-default dipole orientations with a coupling function which is independent of dipole orientation..."
     end
 
@@ -62,13 +62,13 @@ end
 
 function BiasedPrismHamiltonian(chain_length::Int, num_chains::Int, dE::Real;
     interchain_coupling=1.0, E0=100.0, coupling_func=full_dipole_coupling,
-    dipole_orientations = [SVector(0, 0, 1) for i in 1:chain_length*num_chains] #Default is all dipoles parallel and pointing out of x-y plane
+    dipole_orientations = [SVector(0, 1, 0) for i in 1:chain_length*num_chains] #Default is all dipoles parallel and pointing out of x-z plane
    )
 
     #Sanity checks
     num_chains < 3 && error("Prism geometry doesn't make sense for just $(num_chains) chain(s). Use BiasedSheetModel instead.")
 
-    if coupling_func != full_dipole_coupling && dipole_orientations != [SVector(0, 0, 1) for i in 1:chain_length*num_chains]
+    if coupling_func != full_dipole_coupling && dipole_orientations != [SVector(0, 1, 0) for i in 1:chain_length*num_chains]
         @warn "It looks like you have provided some non-default dipole orientations with a coupling function which is independent of dipole orientation..."
     end
 

@@ -8,7 +8,7 @@
 # Convenience method for sheet models
 function BiasedSheetModel(chain_length, num_chains, dE;
     interchain_coupling=1.0, E0=100.0, coupling_func=full_dipole_coupling, 
-    dipole_orientations = [SVector(0, 0, 1) for i in 1:chain_length*num_chains], #Default is all dipoles parallel and pointing out of x-y plane
+    dipole_orientations = [SVector(0, 1, 0) for i in 1:chain_length*num_chains], #Default is all dipoles parallel and pointing out of x-y plane
     kwargs... #kwargs are passed to BiasedNetworkModel
    )
 
@@ -21,7 +21,7 @@ end
 # Convenience method for prism models
 function BiasedPrismModel(chain_length, num_chains, dE;
     interchain_coupling=1.0, E0=100.0, coupling_func=full_dipole_coupling, 
-    dipole_orientations = [SVector(0, 0, 1) for i in 1:chain_length*num_chains], #Default is all dipoles parallel and pointing out of x-y plane
+    dipole_orientations = [SVector(0, 1, 0) for i in 1:chain_length*num_chains], #Default is all dipoles parallel and pointing out of x-y plane
     kwargs... #kwargs are passed to BiasedNetworkModel
    )
 

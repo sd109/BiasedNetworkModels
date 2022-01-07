@@ -141,12 +141,13 @@ update_x(model, x, run_params) = update_x!(copy(model), x, run_params)
 
 
 # Randomly peturbs all site energies with s std dev of `dis` % of average excited state energy (i.e. with E0 subtracted)
-function perturb_Es!(model; dis=1e-2, kwargs...)
-    Es = site_energies(model)
-    E0 = minimum(Es)
+function perturb_Es!(model; dis=1e-1, kwargs...)
     N = numsites(model)
-    E_avg = mean(Es) - E0
-    return vary_site_energies!(model, Es .+ dis*E_avg*randn(N), 1:N; kwargs...)
+    Es = site_energies(model)
+    # E0 = minimum(Es)
+    # E_avg = mean(Es) - E0
+    # return vary_site_energies!(model, Es .+ dis*E_avg*randn(N), 1:N; kwargs...)
+    return vary_site_energies!(model, Es .+ dis*randn(N), 1:N; kwargs...)
 end
 #Non-mutating version
 perturb_Es(model; kwargs...) = perturb_Es!(copy(model); kwargs...)
