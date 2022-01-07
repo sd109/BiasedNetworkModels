@@ -80,9 +80,11 @@ version = "0.1.0"
 
 [[BlackBoxOptim]]
 deps = ["CPUTime", "Compat", "Distributed", "Distributions", "HTTP", "JSON", "LinearAlgebra", "Printf", "Random", "SpatialIndexing", "StatsBase"]
-path = "/home/scottd/.julia/dev/BlackBoxOptim"
+git-tree-sha1 = "b2a50793027db5562e8fa458ae58721179ef4464"
+repo-rev = "multi-x0-borg-moea"
+repo-url = "https://github.com/sd109/BlackBoxOptim.jl"
 uuid = "a134a8b2-14d6-55f6-9291-3336d3ab0209"
-version = "0.6.0"
+version = "0.6.1"
 
 [[CEnum]]
 git-tree-sha1 = "215a9aa4a1f23fbd05b92769fdd62559488d70e9"
