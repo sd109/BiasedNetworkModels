@@ -3,12 +3,12 @@
 const default_run_params = (
     #Essentials
     SaveName = "test",
-    # ChainLength = 12,
-    # NumChains = 2,
-    # dE_ratio = 1.0,
-    # ChainSep = 1.0,
-    # CouplingFunc = distance_only_coupling,
-    # Geom = :sheet,
+    ChainLength = 12,
+    NumChains = 2,
+    dE_ratio = 1.0,
+    ChainSep = 1.0,
+    CouplingFunc = distance_only_coupling,
+    Geom = :sheet,
 
     #Optimization params
     WithEs = true,
@@ -22,9 +22,11 @@ const default_run_params = (
     NumEnsemble = 15,
     Symm = true,
     SearchRange = nothing,
+    EnvParams = (;), #By default, don't provide any kwargs to model constructor
 )
 
-function create_run_params(m::OQSmodel; kwargs...) #kwargs are used to overwrite defaults
+# function create_run_params(m::OQSmodel; kwargs...) #kwargs are used to overwrite defaults
+function create_run_params(; kwargs...) #kwargs are used to overwrite defaults
 
     RP = (; default_run_params..., kwargs...) #Create named tuple 
 
@@ -56,17 +58,18 @@ end
 
 
 # function create_init_model(run_params; kwargs...) #kwargs can be used to set non-standard env params
+function create_init_model(run_params) #Use run_params.EnvParams to set non-standard env params instead
 
-#     if run_params.Geom == :sheet
-#         return BiasedSheetModel(run_params.ChainLength, run_params.NumChains, run_params.dE_ratio; interchain_coupling=1/run_params.ChainSep^3, coupling_func=run_params.CouplingFunc, kwargs...)
-#     elseif run_params.Geom == :prism
-#         return BiasedPrismModel(run_params.ChainLength, run_params.NumChains, run_params.dE_ratio; interchain_coupling=1/run_params.ChainSep^3, coupling_func=run_params.CouplingFunc, kwargs...)
-#     elseif occursin("ring", string(run_params.Geom))
-#         return BiasedRingModel(run_params.ChainLength, run_params.dE_ratio, run_params.Geom; coupling_func=run_params.CouplingFunc, kwargs...)
-#     else
-#         error("Could not create starting model for geom: $(run_params.Geom)")
-#     end
-# end
+    if run_params.Geom == :sheet
+        return BiasedSheetModel(run_params.ChainLength, run_params.NumChains, run_params.dE_ratio; interchain_coupling=1/run_params.ChainSep^3, coupling_func=run_params.CouplingFunc, run_params.EnvParams...)
+    elseif run_params.Geom == :prism
+        return BiasedPrismModel(run_params.ChainLength, run_params.NumChains, run_params.dE_ratio; interchain_coupling=1/run_params.ChainSep^3, coupling_func=run_params.CouplingFunc, run_params.EnvParams...)
+    elseif occursin("ring", string(run_params.Geom))
+        return BiasedRingModel(run_params.ChainLength, run_params.dE_ratio, run_params.Geom; coupling_func=run_params.CouplingFunc, run_params.EnvParams...)
+    else
+        error("Could not create starting model for geom: $(run_params.Geom)")
+    end
+end
 
 
 function get_x(model, run_params)
@@ -254,8 +257,10 @@ end
 
 function current_and_QFIM_trace(model::OQSmodel, run_params::NamedTuple, I_ref::Real)#::Tuple{Float64, Float64}
     Iss = ss_current(model)
-    QFIM = QuantumFIM(model, steady_state, system_FIM_params(model, run_params))::Matrix{ComplexF64} #Annotate return type
-    return (-Iss/I_ref, real(tr(QFIM))) #Use -ve Iss since we want to maximize this value
+    # QFIM = QuantumFIM(model, steady_state, system_FIM_params(model, run_params))::Matrix{ComplexF64} #Annotate return type
+    # return (-Iss/I_ref, real(tr(QFIM))) #Use -ve Iss since we want to maximize this value
+    QFIM_tr = ClassicalAndQuantumFIMs.fast_QFIM_trace(model, steady_state, system_FIM_params(model, run_params))::Float64 #Annotate return type
+    return (-Iss/I_ref, QFIM_tr) #Use -ve Iss since we want to maximize this value
 end
 
 #Version which sets new x before calc of objective values

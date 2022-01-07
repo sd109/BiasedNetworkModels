@@ -85,6 +85,13 @@ s = ArgParseSettings()
         help = "Specifies the sites for which dipole orientations should be optimized (passed to Meta.parse)"
         arg_type = String
         default = "nothing"
+
+    #Add EnvParams option here?
+    "--EnvParams"
+        help = "Specify changes to default kwargs for start model (e.g. env rates)"
+        arg_type = String
+        default = "nothing"
+
 end
 
 cmd_args = (; parse_args(s, as_symbols=true)...,) #Convert arg dict to NamedTuple
@@ -95,7 +102,10 @@ cmd_args = (;
     SingleObjTimeLimit = eval(Meta.parse(cmd_args.SingleObjTimeLimit)), 
     MaxSteps = eval(Meta.parse(cmd_args.MaxSteps)),
     DipoleVarSites = eval(Meta.parse(cmd_args.DipoleVarSites)),
+    EnvParams = cmd_args.EnvParams == "nothing" ? (;) : eval(Meta.parse(replace(cmd_args.EnvParams, "gamma"=>"γ"))) #Use empty NamedTuple, and replace gamma with γ since idk how to use unicode in command line args
 )
+
+typeof(cmd_args.EnvParams) <: NamedTuple || error("You forgot to include at least 1 comma in EnvParams arg to ensure it is parsed as a NamedTuple")
 
 
 #Work out which site energies should be varied during optimization based on geometry spec (usually want fixed input and output site energies)
