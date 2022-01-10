@@ -80,9 +80,7 @@ version = "0.1.1"
 
 [[BlackBoxOptim]]
 deps = ["CPUTime", "Compat", "Distributed", "Distributions", "HTTP", "JSON", "LinearAlgebra", "Printf", "Random", "SpatialIndexing", "StatsBase"]
-git-tree-sha1 = "b2a50793027db5562e8fa458ae58721179ef4464"
-repo-rev = "multi-x0-borg-moea"
-repo-url = "https://github.com/sd109/BlackBoxOptim.jl"
+path = "/home/sd109/.julia/dev/BlackBoxOptim"
 uuid = "a134a8b2-14d6-55f6-9291-3336d3ab0209"
 version = "0.6.1"
 
@@ -134,7 +132,7 @@ version = "0.1.2"
 
 [[ClassicalAndQuantumFIMs]]
 deps = ["LinearAlgebra", "OQSmodels", "QuantumOpticsBase", "ThreadsX"]
-path = "/home/scottd/.julia/dev/ClassicalAndQuantumFIMs"
+path = "/home/sd109/.julia/dev/ClassicalAndQuantumFIMs"
 uuid = "af1c3194-0b7d-4af1-8e44-15d8583e2c2f"
 version = "0.1.0"
 
@@ -752,7 +750,7 @@ version = "0.3.12"
 
 [[OQSmodels]]
 deps = ["FiniteDiff", "FiniteDifferences", "IterTools", "LinearAlgebra", "PauliMasterEquation", "PyCall", "QuantumOptics", "Reexport", "Roots", "Statistics"]
-path = "/home/scottd/.julia/dev/OQSmodels"
+path = "/home/sd109/.julia/dev/OQSmodels"
 uuid = "67cd9eb3-fd8b-4719-9b75-e4624b1b85a1"
 version = "0.1.0"
 
