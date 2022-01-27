@@ -17,8 +17,8 @@ current_and_QFIM_trace(m::OQSmodel, x::Vector{R} where R <: Real, RP::NamedTuple
 function current_and_log_QFIM_volume(model::OQSmodel, run_params::NamedTuple, I_ref::Real)
     Iss = ss_current(model)
     QFIM = real(QuantumFIM(model, steady_state, system_FIM_params(model, run_params)))::Matrix{Float64} #Annotate return type
-     #Use -ve Iss since we want to maximize this value, and use Σ(log(val)) instead of log(product of vals) for numerical stability
-    return -Iss/I_ref, sum(log10.(eigvals(QFIM)))
+    #Use -ve Iss since we want to maximize this value, and use Σ(log(val)) instead of log(product of vals) for numerical stability
+    return -Iss/I_ref, sum(log10.(abs.(eigvals(QFIM))))
 end
 
 #Version which sets new x before calc of objective values
