@@ -1,5 +1,5 @@
 
-using Pkg; Pkg.activate("CQFIM", shared=true)
+using Pkg; Pkg.activate(".")
 
 #Use ArgParse.jl to allow running batch jobs via a single bash script
 using ArgParse
@@ -86,15 +86,21 @@ s = ArgParseSettings()
         arg_type = String
         default = "nothing"
 
-    #Add EnvParams option here?
     "--EnvParams"
         help = "Specify changes to default kwargs for start model (e.g. env rates)"
         arg_type = String
         default = "nothing"
 
+    "--ObjFunc"
+        help = "specifies the objective function to be used for multi-objective optim (currently implement options: current_and_QFIM_trace, current_and_log_QFIM_volume)"
+        arg_type = String
+        default = "current_and_QFIM_trace"
+
 end
 
 cmd_args = (; parse_args(s, as_symbols=true)...,) #Convert arg dict to NamedTuple
+
+using BiasedNetworkModels #Import after parse_args so that option errors are caught quickly
 
 #Convert pass some parameter strings to Meta.parse
 cmd_args = (; 
@@ -102,7 +108,8 @@ cmd_args = (;
     SingleObjTimeLimit = eval(Meta.parse(cmd_args.SingleObjTimeLimit)), 
     MaxSteps = eval(Meta.parse(cmd_args.MaxSteps)),
     DipoleVarSites = eval(Meta.parse(cmd_args.DipoleVarSites)),
-    EnvParams = cmd_args.EnvParams == "nothing" ? (;) : eval(Meta.parse(replace(cmd_args.EnvParams, "gamma"=>"γ"))) #Use empty NamedTuple, and replace gamma with γ since idk how to use unicode in command line args
+    EnvParams = cmd_args.EnvParams == "nothing" ? (;) : eval(Meta.parse(replace(cmd_args.EnvParams, "gamma"=>"γ"))), #Use empty NamedTuple, and replace gamma with γ since idk how to use unicode in command line args
+    ObjFunc = eval(Meta.parse(cmd_args.ObjFunc)),
 )
 
 typeof(cmd_args.EnvParams) <: NamedTuple || error("You forgot to include at least 1 comma in EnvParams arg to ensure it is parsed as a NamedTuple")
@@ -129,7 +136,6 @@ if cmd_args.WithDipoles && cmd_args.DipoleVarSites === nothing
 end
 
 
-using BiasedNetworkModels
 #Parse coherent coupling specification
 if cmd_args.CouplingFunc == "full_dipole_coupling"
     cmd_args = (; cmd_args..., CouplingFunc=BiasedNetworkModels.full_dipole_coupling)
@@ -142,4 +148,4 @@ end
 
 #Start main optimization procedure
 run_params = create_run_params(; cmd_args...)
-run_multi_obj_opt(run_params);
+run_multi_obj_opt(run_params; obj_func = run_params.ObjFunc);
